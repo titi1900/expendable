@@ -1,0 +1,3548 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MILLENNIUM SOLDIER: EXPENDABLE 3D // ÉDITION GORE & CHEAT</title>
+    <!-- Chargement de Three.js r128 depuis CDNJS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&display=swap');
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #05070a;
+            font-family: 'Orbitron', sans-serif;
+            color: #e2e8f0;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            cursor: crosshair;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Effet Scanline léger façon borne Dreamcast / Arcade */
+        .scanlines {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(
+                rgba(18, 16, 16, 0) 50%, 
+                rgba(0, 0, 0, 0.22) 50%
+            );
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        /* Flash d'écran lors de dégâts ou Smart Bomb */
+        #screen-flash {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.08s ease-out;
+            z-index: 6;
+        }
+
+        /* HUD en jeu */
+        #hud {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 10;
+            padding: 16px 22px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .hud-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+        }
+
+        .hud-panel {
+            background: rgba(8, 14, 24, 0.78);
+            border: 1px solid rgba(56, 189, 248, 0.45);
+            box-shadow: 0 0 18px rgba(14, 165, 233, 0.18), inset 0 0 10px rgba(14, 165, 233, 0.12);
+            padding: 10px 16px;
+            border-radius: 6px;
+            backdrop-filter: blur(4px);
+        }
+
+        .hud-label {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 11px;
+            letter-spacing: 1.8px;
+            color: #7dd3fc;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .bar-container {
+            width: 190px;
+            height: 12px;
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid rgba(148, 163, 184, 0.4);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 6px;
+        }
+
+        .bar-fill {
+            height: 100%;
+            width: 100%;
+            transition: width 0.12s ease-out;
+        }
+
+        #hp-bar {
+            background: linear-gradient(90deg, #ef4444, #f97316, #22c55e);
+            box-shadow: 0 0 10px rgba(34, 197, 94, 0.6);
+        }
+
+        #shield-bar {
+            background: linear-gradient(90deg, #0284c7, #38bdf8);
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
+        }
+
+        #dash-bar {
+            background: linear-gradient(90deg, #a855f7, #e879f9);
+            box-shadow: 0 0 10px rgba(217, 70, 239, 0.6);
+        }
+
+        .score-val {
+            font-size: 24px;
+            font-weight: 900;
+            color: #facc15;
+            text-shadow: 0 0 12px rgba(250, 204, 21, 0.55);
+            letter-spacing: 1px;
+        }
+
+        .combo-badge {
+            display: inline-block;
+            margin-left: 8px;
+            padding: 2px 7px;
+            background: linear-gradient(135deg, #f97316, #dc2626);
+            color: #fff;
+            font-size: 13px;
+            font-weight: 900;
+            border-radius: 4px;
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.6);
+        }
+
+        /* Barre de progression du secteur & Boss */
+        .hud-center-top {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+            max-width: 440px;
+        }
+
+        .sector-box {
+            width: 100%;
+            text-align: center;
+        }
+
+        .sector-bar-bg {
+            width: 100%;
+            height: 8px;
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid rgba(250, 204, 21, 0.4);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        #sector-progress {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #f59e0b, #fde047);
+            box-shadow: 0 0 10px rgba(250, 204, 21, 0.7);
+            transition: width 0.2s linear;
+        }
+
+        #boss-hud {
+            display: none;
+            width: 100%;
+            background: rgba(35, 6, 12, 0.88);
+            border: 1px solid #ef4444;
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.45);
+            padding: 8px 14px;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        #boss-name {
+            font-size: 13px;
+            font-weight: 900;
+            color: #fca5a5;
+            letter-spacing: 2px;
+            margin-bottom: 5px;
+        }
+
+        .boss-bar-bg {
+            width: 100%;
+            height: 14px;
+            background: #1c0508;
+            border: 1px solid #f87171;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        #boss-hp-bar {
+            height: 100%;
+            width: 100%;
+            background: linear-gradient(90deg, #991b1b, #ef4444, #fb923c);
+            transition: width 0.1s linear;
+        }
+
+        /* Annonce vocale / Alerte tactique au centre */
+        #tactical-banner {
+            position: absolute;
+            top: 24%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.9);
+            font-size: clamp(18px, 3vw, 32px);
+            font-weight: 900;
+            letter-spacing: 3px;
+            color: #fef08a;
+            text-shadow: 0 0 20px rgba(234, 179, 8, 0.85), 2px 2px 0 #7f1d1d;
+            background: rgba(15, 23, 42, 0.72);
+            border-top: 2px solid #facc15;
+            border-bottom: 2px solid #facc15;
+            padding: 8px 28px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s ease, transform 0.25s ease;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        #tactical-banner.active {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        /* HUD Bas : Armes & Smart Bombs */
+        .hud-bottom {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 16px;
+        }
+
+        .weapon-display {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .weapon-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            font-size: 18px;
+            background: rgba(14, 165, 233, 0.2);
+            border: 1px solid #38bdf8;
+            color: #38bdf8;
+            box-shadow: 0 0 12px rgba(56, 189, 248, 0.35);
+        }
+
+        #weapon-name {
+            font-size: 16px;
+            font-weight: 900;
+            color: #fff;
+            letter-spacing: 1px;
+        }
+
+        #weapon-ammo-bar-bg {
+            width: 150px;
+            height: 7px;
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            border-radius: 3px;
+            margin-top: 5px;
+            overflow: hidden;
+        }
+
+        #weapon-ammo-bar {
+            height: 100%;
+            width: 100%;
+            background: #facc15;
+        }
+
+        .bombs-list {
+            display: flex;
+            gap: 8px;
+            margin-top: 4px;
+        }
+
+        .bomb-pip {
+            width: 24px;
+            height: 14px;
+            border-radius: 3px;
+            background: linear-gradient(135deg, #f97316, #ef4444);
+            border: 1px solid #fed7aa;
+            box-shadow: 0 0 8px rgba(249, 115, 22, 0.7);
+            transition: all 0.2s;
+        }
+
+        .bomb-pip.empty {
+            background: rgba(30, 41, 59, 0.6);
+            border-color: rgba(100, 116, 139, 0.4);
+            box-shadow: none;
+        }
+
+        /* Bouton Audio interactif */
+        #audio-toggle {
+            pointer-events: auto;
+            cursor: pointer;
+            background: rgba(8, 14, 24, 0.85);
+            border: 1px solid #38bdf8;
+            color: #e0f2fe;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 12px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            transition: all 0.15s;
+        }
+
+        #audio-toggle:hover {
+            background: #0284c7;
+            color: #fff;
+        }
+
+        /* Écrans superposés (Menu Démarrage / Game Over / Victoire) */
+        .overlay-screen {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at center, rgba(10, 18, 32, 0.84) 0%, rgba(3, 6, 12, 0.96) 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 30;
+            padding: 20px;
+            text-align: center;
+            backdrop-filter: blur(6px);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .title-sub {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: clamp(12px, 1.8vw, 16px);
+            letter-spacing: 5px;
+            color: #38bdf8;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+        }
+
+        .title-main {
+            font-size: clamp(32px, 6vw, 68px);
+            font-weight: 900;
+            line-height: 1.02;
+            letter-spacing: 3px;
+            background: linear-gradient(180deg, #ffffff 0%, #94a3b8 48%, #f97316 52%, #facc15 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 4px 18px rgba(249, 115, 22, 0.45));
+            margin-bottom: 18px;
+        }
+
+        .lore-box {
+            max-width: 680px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            color: #cbd5e1;
+            background: rgba(15, 23, 42, 0.78);
+            border-left: 3px solid #ef4444;
+            padding: 12px 18px;
+            margin-bottom: 22px;
+            border-radius: 0 6px 6px 0;
+        }
+
+        .difficulty-group {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .diff-btn {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 13px;
+            font-weight: 700;
+            padding: 10px 18px;
+            border-radius: 6px;
+            border: 1px solid rgba(148, 163, 184, 0.45);
+            background: rgba(15, 23, 42, 0.85);
+            color: #94a3b8;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .diff-btn:hover {
+            border-color: #38bdf8;
+            color: #fff;
+        }
+
+        .diff-btn.selected {
+            border-color: #facc15;
+            background: linear-gradient(135deg, rgba(234, 179, 8, 0.25), rgba(249, 115, 22, 0.35));
+            color: #fef08a;
+            box-shadow: 0 0 15px rgba(250, 204, 21, 0.4);
+        }
+
+        .arcade-btn {
+            font-family: 'Orbitron', sans-serif;
+            font-size: clamp(16px, 2.2vw, 22px);
+            font-weight: 900;
+            letter-spacing: 2px;
+            padding: 16px 40px;
+            border-radius: 8px;
+            border: 2px solid #fde047;
+            background: linear-gradient(180deg, #f97316 0%, #dc2626 100%);
+            color: #fff;
+            cursor: pointer;
+            box-shadow: 0 0 28px rgba(239, 68, 68, 0.65), inset 0 2px 4px rgba(255, 255, 255, 0.45);
+            transition: transform 0.12s, box-shadow 0.12s;
+            animation: pulseBtn 1.6s infinite;
+        }
+
+        .arcade-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 38px rgba(250, 204, 21, 0.9);
+        }
+
+        .arcade-btn:active {
+            transform: scale(0.98);
+        }
+
+        @keyframes pulseBtn {
+            0%, 100% { filter: brightness(1); }
+            50% { filter: brightness(1.18); }
+        }
+
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            gap: 10px;
+            max-width: 720px;
+            width: 100%;
+            margin-top: 26px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 12px;
+        }
+
+        .ctrl-item {
+            background: rgba(15, 23, 42, 0.75);
+            border: 1px solid rgba(56, 189, 248, 0.25);
+            padding: 8px 10px;
+            border-radius: 5px;
+            color: #94a3b8;
+        }
+
+        .ctrl-key {
+            color: #38bdf8;
+            font-weight: bold;
+            display: block;
+            margin-bottom: 2px;
+        }
+
+        /* Écran de fin */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 14px;
+            max-width: 560px;
+            width: 100%;
+            margin: 20px 0 28px;
+        }
+
+        .stat-card {
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid rgba(56, 189, 248, 0.4);
+            padding: 14px 10px;
+            border-radius: 6px;
+        }
+
+        .stat-num {
+            font-size: 24px;
+            font-weight: 900;
+            color: #facc15;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div class="scanlines"></div>
+    <div id="screen-flash"></div>
+
+    <!-- HUD EN JEU -->
+    <div id="hud" class="hidden">
+        <div class="hud-top">
+            <!-- État du Clone Millennium -->
+            <div class="hud-panel">
+                <div class="hud-label">ARMURE EXOSQUELETTE</div>
+                <div class="bar-container">
+                    <div id="hp-bar" class="bar-fill"></div>
+                </div>
+                <div class="hud-label">BOUCLIER PLASMA</div>
+                <div class="bar-container">
+                    <div id="shield-bar" class="bar-fill"></div>
+                </div>
+                <div class="hud-label">PROPULSEUR DASH [ESPACE]</div>
+                <div class="bar-container" style="margin-bottom: 0; height: 8px;">
+                    <div id="dash-bar" class="bar-fill"></div>
+                </div>
+            </div>
+
+            <!-- Progression Secteur & Barre de Boss -->
+            <div class="hud-center-top">
+                <div class="hud-panel sector-box">
+                    <div class="hud-label" id="sector-label">NIVEAU 01/25 // CANYON DE CONFINEMENT</div>
+                    <div class="sector-bar-bg">
+                        <div id="sector-progress"></div>
+                    </div>
+                </div>
+
+                <div id="boss-hud">
+                    <div id="boss-name">ALERTE : LÉVIATHAN CARNASSIER MK-IX</div>
+                    <div class="boss-bar-bg">
+                        <div id="boss-hp-bar"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Score & Audio -->
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
+                <div class="hud-panel" style="text-align: right;">
+                    <div class="hud-label">SCORE TACTIQUE</div>
+                    <div>
+                        <span class="score-val" id="score-val">000000</span>
+                        <span class="combo-badge" id="combo-val">x1</span>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 6px;">
+                    <button id="pause-toggle" style="pointer-events:auto; cursor:pointer; background:rgba(8,14,24,0.85); border:1px solid #facc15; color:#fef08a; font-family:'Share Tech Mono',monospace; font-size:12px; padding:8px 10px; border-radius:6px;">PAUSE [P]</button>
+                    <button id="audio-toggle">AUDIO : ON</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bannière tactique dynamique -->
+        <div id="tactical-banner">ARME AMÉLIORÉE !</div>
+
+        <!-- Bas du HUD : Armes & Smart Bombs -->
+        <div class="hud-bottom">
+            <div class="hud-panel weapon-display">
+                <div class="weapon-icon" id="weapon-icon">P</div>
+                <div>
+                    <div class="hud-label">SYSTÈME D'ARMEMENT</div>
+                    <div id="weapon-name">FUSIL D'ASSAUT LOURD</div>
+                    <div id="weapon-ammo-bar-bg">
+                        <div id="weapon-ammo-bar"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="hud-panel" style="text-align: right;">
+                <div class="hud-label">SMART BOMBS [CLIC DROIT / E]</div>
+                <div class="bombs-list" id="bombs-container">
+                    <div class="bomb-pip"></div>
+                    <div class="bomb-pip"></div>
+                    <div class="bomb-pip"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ÉCRAN D'ACCUEIL ARCADE -->
+    <div id="start-screen" class="overlay-screen">
+        <div class="title-sub">UNITÉ CLONE DE COMBAT // PROTOCOLE PURGE</div>
+        <h1 class="title-main">MILLENNIUM SOLDIER:<br>EXPENDABLE 3D</h1>
+        <div class="lore-box">
+            Infiltrez le canyon sinueux infesté d'abominations : Écorcheurs spectraux, Cracheuses d'acide, Colosses Blindés.
+            Surprises alliées ou embuscades xéno à chaque détour, mines de sang, gore total. Protégez-vous derrière les obstacles et survivez jusqu'au BIG BOSS final !
+        </div>
+
+        <div class="difficulty-group" id="diff-selector">
+            <button class="diff-btn" data-diff="stagiaire">STAGIAIRE // 5 NIVEAUX</button>
+            <button class="diff-btn" data-diff="recrue">RECRUE // 15 NIVEAUX</button>
+            <button class="diff-btn selected" data-diff="soldat">SOLDAT // 25 NIVEAUX</button>
+            <button class="diff-btn" data-diff="veteran">VÉTÉRAN // 35 NIVEAUX</button>
+            <button class="diff-btn" data-diff="expendable">EXPENDABLE // 50 NIVEAUX</button>
+        </div>
+
+        <button class="diff-btn" id="cheat-btn" style="border-color:#a855f7; color:#e9d5ff;">☢ MODE CHEAT : DÉSACTIVÉ [C]</button>
+
+        <button class="arcade-btn" id="start-btn">INSERT COIN // DÉMARRER</button>
+
+        <div class="controls-grid">
+            <div class="ctrl-item"><span class="ctrl-key">ZQSD / WASD / FLÈCHES</span>Déplacement & Couvert</div>
+            <div class="ctrl-item"><span class="ctrl-key">SOURIS + CLIC GAUCHE</span>Visée Torche & Tir Lourd</div>
+            <div class="ctrl-item"><span class="ctrl-key">ESPACE / MAJ</span>Dash Tactique (Esquive)</div>
+            <div class="ctrl-item"><span class="ctrl-key">CLIC DROIT / TOUCHE E</span>Smart Bomb Plasma</div>
+            <div class="ctrl-item"><span class="ctrl-key">TOUCHE C</span>Mode Cheat Invincibilité</div>
+        </div>
+    </div>
+
+    <!-- ÉCRAN DE FIN DE PARTIE / VICTOIRE -->
+    <div id="end-screen" class="overlay-screen hidden">
+        <div class="title-sub" id="end-sub">RAPPORT DE MISSION</div>
+        <h1 class="title-main" id="end-title">CLONE ÉLIMINÉ</h1>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="hud-label">SCORE FINAL</div>
+                <div class="stat-num" id="final-score">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="hud-label">MONSTRES ÉVISCÉRÉS</div>
+                <div class="stat-num" id="final-kills">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="hud-label">SECTEUR ATTEINT</div>
+                <div class="stat-num" id="final-sector">01</div>
+            </div>
+        </div>
+
+        <button class="arcade-btn" id="restart-btn">NOUVEAU CLONE // REJOUER</button>
+    </div>
+</div>
+
+<script>
+/**
+ * ============================================================================
+ * MOTEUR AUDIO PROCÉDURAL (WEB AUDIO API)
+ * Techno-Industrielle sombre + Rugissements organiques & Impacts gores
+ * ============================================================================
+ */
+class ArcadeAudioEngine {
+    constructor() {
+        this.ctx = null;
+        this.enabled = true;
+        this.isPlayingMusic = false;
+        this.step = 0;
+        this.tempo = 142;
+        this.musicTimer = null;
+        this.masterGain = null;
+        this.musicGain = null;
+        this.sfxGain = null;
+        this.noiseBuffer = null;
+    }
+
+    init() {
+        if (this.ctx) {
+            if (this.ctx.state === 'suspended') this.ctx.resume();
+            return;
+        }
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        this.ctx = new AudioCtx();
+
+        this.masterGain = this.ctx.createGain();
+        this.masterGain.gain.value = 0.68;
+        this.masterGain.connect(this.ctx.destination);
+
+        this.musicGain = this.ctx.createGain();
+        this.musicGain.gain.value = 0.30;
+        this.musicGain.connect(this.masterGain);
+
+        this.sfxGain = this.ctx.createGain();
+        this.sfxGain.gain.value = 0.82;
+        this.sfxGain.connect(this.masterGain);
+
+        const bufferSize = this.ctx.sampleRate * 1.5;
+        this.noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = this.noiseBuffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+        }
+    }
+
+    toggle() {
+        this.enabled = !this.enabled;
+        if (this.masterGain && this.ctx) {
+            this.masterGain.gain.setTargetAtTime(this.enabled ? 0.68 : 0, this.ctx.currentTime, 0.03);
+        }
+        return this.enabled;
+    }
+
+    startMusic() {
+        this.init();
+        if (this.isPlayingMusic) return;
+        this.isPlayingMusic = true;
+        this.step = 0;
+        const sixteenthMs = (60 / this.tempo / 4) * 1000;
+        this.musicTimer = setInterval(() => this.tickMusic(), sixteenthMs);
+    }
+
+    stopMusic() {
+        this.isPlayingMusic = false;
+        if (this.musicTimer) {
+            clearInterval(this.musicTimer);
+            this.musicTimer = null;
+        }
+    }
+
+    tickMusic() {
+        if (!this.enabled || !this.ctx || this.ctx.state !== 'running') return;
+        const now = this.ctx.currentTime;
+        const s = this.step % 16;
+
+        if (s === 0 || s === 4 || s === 8 || s === 12 || s === 14) this.playKick(now);
+        if (s === 4 || s === 12) this.playSnare(now);
+        if (s % 2 === 1) this.playHat(now, s % 4 === 3 ? 0.09 : 0.045);
+
+        // Basse industrielle agressive en Do# mineur / Ré mineur
+        const bassPattern = [
+            34.65, 34.65, 69.30, 34.65,
+            34.65, 41.20, 34.65, 46.25,
+            34.65, 34.65, 69.30, 34.65,
+            51.91, 46.25, 41.20, 30.87
+        ];
+        const freq = bassPattern[s];
+        if (freq) this.playAcidBass(now, freq, 0.11);
+
+        if (this.step % 4 === 0) {
+            const darkNotes = [277.18, 329.63, 415.30, 311.13, 277.18, 246.94, 207.65, 233.08];
+            const note = darkNotes[(this.step / 4) % darkNotes.length];
+            this.playSynthLead(now, note, 0.18);
+        }
+
+        this.step++;
+    }
+
+    playKick(t) {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(145, t);
+        osc.frequency.exponentialRampToValueAtTime(34, t + 0.12);
+        gain.gain.setValueAtTime(0.8, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+        osc.connect(gain);
+        gain.connect(this.musicGain);
+        osc.start(t);
+        osc.stop(t + 0.17);
+    }
+
+    playSnare(t) {
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = this.noiseBuffer;
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.value = 1250;
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.38, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.musicGain);
+        noise.start(t);
+        noise.stop(t + 0.15);
+    }
+
+    playHat(t, vol) {
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = this.noiseBuffer;
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'highpass';
+        filter.frequency.value = 7200;
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(vol, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.045);
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.musicGain);
+        noise.start(t);
+        noise.stop(t + 0.05);
+    }
+
+    playAcidBass(t, freq, dur) {
+        const osc = this.ctx.createOscillator();
+        const filter = this.ctx.createBiquadFilter();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(freq, t);
+        filter.type = 'lowpass';
+        filter.Q.value = 7;
+        filter.frequency.setValueAtTime(freq * 6.5, t);
+        filter.frequency.exponentialRampToValueAtTime(freq * 1.4, t + dur);
+        gain.gain.setValueAtTime(0.34, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.musicGain);
+        osc.start(t);
+        osc.stop(t + dur + 0.01);
+    }
+
+    playSynthLead(t, freq, dur) {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(freq, t);
+        gain.gain.setValueAtTime(0.07, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+        osc.connect(gain);
+        gain.connect(this.musicGain);
+        osc.start(t);
+        osc.stop(t + dur + 0.01);
+    }
+
+    playShoot(weaponType) {
+        if (!this.enabled || !this.ctx) return;
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        if (weaponType === 'PULSE') {
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(540 + Math.random() * 80, t);
+            osc.frequency.exponentialRampToValueAtTime(110, t + 0.075);
+            gain.gain.setValueAtTime(0.18, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+            osc.connect(gain);
+            gain.connect(this.sfxGain);
+            osc.start(t);
+            osc.stop(t + 0.085);
+        } else if (weaponType === 'SPREAD') {
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(360, t);
+            osc.frequency.exponentialRampToValueAtTime(75, t + 0.13);
+            gain.gain.setValueAtTime(0.24, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+            osc.connect(gain);
+            gain.connect(this.sfxGain);
+            osc.start(t);
+            osc.stop(t + 0.15);
+        } else if (weaponType === 'LASER') {
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(1450, t);
+            osc.frequency.exponentialRampToValueAtTime(290, t + 0.11);
+            gain.gain.setValueAtTime(0.22, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+            osc.connect(gain);
+            gain.connect(this.sfxGain);
+            osc.start(t);
+            osc.stop(t + 0.12);
+        } else if (weaponType === 'MISSILE') {
+            const noise = this.ctx.createBufferSource();
+            noise.buffer = this.noiseBuffer;
+            const filter = this.ctx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.setValueAtTime(850, t);
+            filter.frequency.exponentialRampToValueAtTime(2400, t + 0.18);
+            gain.gain.setValueAtTime(0.25, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.19);
+            noise.connect(filter);
+            filter.connect(gain);
+            gain.connect(this.sfxGain);
+            noise.start(t);
+            noise.stop(t + 0.2);
+        }
+    }
+
+    // Impact de balle dans la chair / éclaboussure gore
+    playFleshHit() {
+        if (!this.enabled || !this.ctx) return;
+        const t = this.ctx.currentTime;
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = this.noiseBuffer;
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.Q.value = 3.5;
+        filter.frequency.setValueAtTime(720 + Math.random() * 250, t);
+        filter.frequency.exponentialRampToValueAtTime(240, t + 0.065);
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.22, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.sfxGain);
+        noise.start(t);
+        noise.stop(t + 0.075);
+    }
+
+    // Hurlement / Grognement monstrueux à la mort ou à l'apparition
+    playMonsterRoar(pitch = 1.0) {
+        if (!this.enabled || !this.ctx) return;
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const filter = this.ctx.createBiquadFilter();
+        const gain = this.ctx.createGain();
+
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(145 * pitch, t);
+        osc.frequency.linearRampToValueAtTime(72 * pitch, t + 0.28);
+
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(600, t);
+
+        gain.gain.setValueAtTime(0.26, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.sfxGain);
+        osc.start(t);
+        osc.stop(t + 0.31);
+    }
+
+    playDash() {
+        if (!this.enabled || !this.ctx) return;
+        const t = this.ctx.currentTime;
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = this.noiseBuffer;
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(400, t);
+        filter.frequency.exponentialRampToValueAtTime(1900, t + 0.16);
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.28, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.sfxGain);
+        noise.start(t);
+        noise.stop(t + 0.19);
+    }
+
+    playExplosion(scale = 1.0) {
+        if (!this.enabled || !this.ctx) return;
+        const t = this.ctx.currentTime;
+        const dur = 0.28 + scale * 0.25;
+
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = this.noiseBuffer;
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(650 * scale, t);
+        filter.frequency.exponentialRampToValueAtTime(55, t + dur);
+
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(Math.min(0.68, 0.36 * scale), t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.sfxGain);
+        noise.start(t);
+        noise.stop(t + dur + 0.02);
+
+        const sub = this.ctx.createOscillator();
+        const subGain = this.ctx.createGain();
+        sub.type = 'sine';
+        sub.frequency.setValueAtTime(115, t);
+        sub.frequency.exponentialRampToValueAtTime(26, t + dur * 0.8);
+        subGain.gain.setValueAtTime(Math.min(0.62, 0.34 * scale), t);
+        subGain.gain.exponentialRampToValueAtTime(0.001, t + dur * 0.85);
+        sub.connect(subGain);
+        subGain.connect(this.sfxGain);
+        sub.start(t);
+        sub.stop(t + dur * 0.9);
+    }
+
+    playPowerup() {
+        if (!this.enabled || !this.ctx) return;
+        const t = this.ctx.currentTime;
+        const notes = [523.25, 659.25, 783.99, 1046.50];
+        notes.forEach((n, idx) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(n, t + idx * 0.05);
+            gain.gain.setValueAtTime(0.24, t + idx * 0.05);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + idx * 0.05 + 0.14);
+            osc.connect(gain);
+            gain.connect(this.sfxGain);
+            osc.start(t + idx * 0.05);
+            osc.stop(t + idx * 0.05 + 0.15);
+        });
+    }
+
+    playSmartBomb() {
+        if (!this.enabled || !this.ctx) return;
+        this.playExplosion(2.2);
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(880, t);
+        osc.frequency.exponentialRampToValueAtTime(42, t + 0.75);
+        gain.gain.setValueAtTime(0.45, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.78);
+        osc.connect(gain);
+        gain.connect(this.sfxGain);
+        osc.start(t);
+        osc.stop(t + 0.8);
+    }
+
+    playHit() {
+        if (!this.enabled || !this.ctx) return;
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(195, t);
+        osc.frequency.linearRampToValueAtTime(70, t + 0.1);
+        gain.gain.setValueAtTime(0.28, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.11);
+        osc.connect(gain);
+        gain.connect(this.sfxGain);
+        osc.start(t);
+        osc.stop(t + 0.11);
+    }
+}
+
+/**
+ * ============================================================================
+ * CONFIGURATION & CONSTANTES DU JEU EXPENDABLE 3D
+ * ============================================================================
+ */
+const WEAPONS = {
+    PULSE: {
+        name: 'FUSIL D\'ASSAUT LOURD',
+        icon: 'P',
+        color: 0xfacc15,
+        fireRate: 0.095,
+        speed: 55,
+        damage: 17,
+        infinite: true
+    },
+    SPREAD: {
+        name: 'CANON DISPERSION X5',
+        icon: 'S',
+        color: 0xf97316,
+        fireRate: 0.21,
+        speed: 46,
+        damage: 19,
+        maxAmmo: 150
+    },
+    LASER: {
+        name: 'RAYON RAIL PLASMA',
+        icon: 'L',
+        color: 0x38bdf8,
+        fireRate: 0.13,
+        speed: 82,
+        damage: 36,
+        maxAmmo: 120
+    },
+    MISSILE: {
+        name: 'POD MISSILES TÊTE-CHERCHEUSE',
+        icon: 'M',
+        color: 0xef4444,
+        fireRate: 0.25,
+        speed: 40,
+        damage: 45,
+        maxAmmo: 75
+    }
+};
+
+const DIFFICULTY_SETTINGS = {
+    stagiaire:  { enemyHpMult: 0.55, enemyDmgMult: 0.50, spawnRateMult: 1.40, sectors: 5 },
+    recrue:     { enemyHpMult: 0.75, enemyDmgMult: 0.65, spawnRateMult: 1.25, sectors: 15 },
+    soldat:     { enemyHpMult: 1.00, enemyDmgMult: 1.00, spawnRateMult: 1.00, sectors: 25 },
+    veteran:    { enemyHpMult: 1.30, enemyDmgMult: 1.30, spawnRateMult: 0.80, sectors: 35 },
+    expendable: { enemyHpMult: 1.60, enemyDmgMult: 1.60, spawnRateMult: 0.62, sectors: 50 }
+};
+
+/**
+ * ============================================================================
+ * CLASSE PRINCIPALE DU JEU 3D
+ * ============================================================================
+ */
+class ExpendableGame {
+    constructor() {
+        this.container = document.getElementById('game-container');
+        this.audio = new ArcadeAudioEngine();
+
+        this.state = 'MENU'; // MENU, PLAYING, PAUSED, GAMEOVER, VICTORY
+        this.difficulty = 'soldat';
+        this.maxSectors = 25;
+        this.cheatMode = false; // Invincibilité : touche C ou bouton ☢
+        this.score = 0;
+        this.combo = 1;
+        this.comboTimer = 0;
+        this.kills = 0;
+        this.sector = 1;
+        this.sectorDistance = 0;
+        this.sectorGoal = 260;
+        this.maxSectors = DIFFICULTY_SETTINGS[this.difficulty].sectors;
+        this.bossSpawned = false;
+        this.boss = null;
+
+        this.screenShake = 0;
+        this.hitStopTimer = 0;
+
+        this.keys = {};
+        this.mouseNDC = new THREE.Vector2();
+        this.aimWorldPoint = new THREE.Vector3(0, 1, -10);
+        this.isFiring = false;
+
+        // Entités dynamiques
+        this.bullets = [];
+        this.enemyBullets = [];
+        this.enemies = [];
+        this.obstacles = [];   // Abris tactiques (bunkers, piliers, barricades)
+        this.props = [];       // Caisses destructibles et barils explosifs
+        this.pickups = [];     // Bonus d'armes, boucliers, bombes
+        this.particles = [];   // Explosions, viscères (gibs), sang
+        this.bloodPools = [];  // Flaques de sang persistantes au sol
+        this.floorTiles = [];  // Segments de canyon sinueux
+
+        this.ui = {
+            hud: document.getElementById('hud'),
+            startScreen: document.getElementById('start-screen'),
+            endScreen: document.getElementById('end-screen'),
+            hpBar: document.getElementById('hp-bar'),
+            shieldBar: document.getElementById('shield-bar'),
+            dashBar: document.getElementById('dash-bar'),
+            scoreVal: document.getElementById('score-val'),
+            comboVal: document.getElementById('combo-val'),
+            sectorLabel: document.getElementById('sector-label'),
+            sectorProgress: document.getElementById('sector-progress'),
+            bossHud: document.getElementById('boss-hud'),
+            bossName: document.getElementById('boss-name'),
+            bossHpBar: document.getElementById('boss-hp-bar'),
+            tacticalBanner: document.getElementById('tactical-banner'),
+            weaponIcon: document.getElementById('weapon-icon'),
+            weaponName: document.getElementById('weapon-name'),
+            weaponAmmoBar: document.getElementById('weapon-ammo-bar'),
+            bombsContainer: document.getElementById('bombs-container'),
+            screenFlash: document.getElementById('screen-flash')
+        };
+
+        this.initThree();
+        this.initEnvironment();
+        this.createPlayerMesh();
+        this.bindEvents();
+
+        this.clock = new THREE.Clock();
+        this.animate = this.animate.bind(this);
+        requestAnimationFrame(this.animate);
+    }
+
+    /**
+     * Initialisation de la scène Three.js sombre et atmosphérique
+     */
+    initThree() {
+        this.scene = new THREE.Scene();
+        this.scene.background = new THREE.Color(0x05070c);
+        this.scene.fog = new THREE.FogExp2(0x05070c, 0.019);
+
+        const aspect = window.innerWidth / window.innerHeight;
+        this.camera = new THREE.PerspectiveCamera(46, aspect, 0.1, 170);
+        this.camera.position.set(0, 21, 17);
+        this.camera.lookAt(0, 0, -3);
+
+        this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        this.container.insertBefore(this.renderer.domElement, this.container.firstChild);
+
+        // Éclairage ambiant froid + lune/projecteur orbital
+        const hemiLight = new THREE.HemisphereLight(0x475569, 0x1a0b0e, 0.55);
+        this.scene.add(hemiLight);
+
+        this.dirLight = new THREE.DirectionalLight(0xcbd5e1, 0.85);
+        this.dirLight.position.set(16, 30, 14);
+        this.dirLight.castShadow = true;
+        this.dirLight.shadow.mapSize.width = 1024;
+        this.dirLight.shadow.mapSize.height = 1024;
+        this.dirLight.shadow.camera.near = 5;
+        this.dirLight.shadow.camera.far = 80;
+        const d = 28;
+        this.dirLight.shadow.camera.left = -d;
+        this.dirLight.shadow.camera.right = d;
+        this.dirLight.shadow.camera.top = d;
+        this.dirLight.shadow.camera.bottom = -d;
+        this.scene.add(this.dirLight);
+
+        // Lumière d'ambiance du joueur + flash de tir
+        this.playerLight = new THREE.PointLight(0x38bdf8, 1.3, 14);
+        this.playerLight.position.set(0, 3, 0);
+        this.scene.add(this.playerLight);
+
+        this.muzzleLight = new THREE.PointLight(0xfacc15, 0, 16);
+        this.scene.add(this.muzzleLight);
+
+        // Lampe torche tactique montée sur le casque du soldat
+        this.flashLight = new THREE.SpotLight(0xe0f2fe, 2.4, 34, Math.PI / 5.5, 0.45, 1.1);
+        this.flashLightTarget = new THREE.Object3D();
+        this.scene.add(this.flashLightTarget);
+        this.flashLight.target = this.flashLightTarget;
+        this.scene.add(this.flashLight);
+
+        this.aimPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -1.0);
+        this.raycaster = new THREE.Raycaster();
+    }
+
+    /**
+     * Fonction mathématique définissant l'axe sinueux du canyon à une coordonnée monde Z
+     */
+    getCanyonCenterX(worldZ) {
+        return Math.sin(worldZ * 0.052) * 10.8 + Math.cos(worldZ * 0.027) * 5.6 + Math.sin(worldZ * 0.011) * 3.2;
+    }
+
+    getCanyonHalfWidth(worldZ) {
+        return 10.6 + Math.sin(worldZ * 0.075) * 2.9;
+    }
+
+    /**
+     * Création du canyon industriel sinueux bordé de falaises rocheuses et murs blindés
+     */
+    initEnvironment() {
+        this.worldScrollZ = 0;
+        this.tileLength = 6.0;
+        this.numTiles = 16;
+
+        // Texture de sol industriel usé et taché
+        const floorCanvas = document.createElement('canvas');
+        floorCanvas.width = 512;
+        floorCanvas.height = 512;
+        const fctx = floorCanvas.getContext('2d');
+
+        fctx.fillStyle = '#161b22';
+        fctx.fillRect(0, 0, 512, 512);
+
+        fctx.strokeStyle = '#262f3d';
+        fctx.lineWidth = 4;
+        for (let i = 0; i <= 512; i += 128) {
+            fctx.beginPath(); fctx.moveTo(i, 0); fctx.lineTo(i, 512); fctx.stroke();
+            fctx.beginPath(); fctx.moveTo(0, i); fctx.lineTo(512, i); fctx.stroke();
+        }
+
+        // Traces de chenilles et salissures
+        fctx.fillStyle = 'rgba(10, 12, 16, 0.45)';
+        fctx.fillRect(90, 0, 48, 512);
+        fctx.fillRect(374, 0, 48, 512);
+
+        const floorTex = new THREE.CanvasTexture(floorCanvas);
+        floorTex.wrapS = THREE.RepeatWrapping;
+        floorTex.wrapT = THREE.RepeatWrapping;
+
+        this.floorMat = new THREE.MeshStandardMaterial({
+            map: floorTex,
+            roughness: 0.75,
+            metalness: 0.45
+        });
+
+        this.rockMat = new THREE.MeshStandardMaterial({
+            color: 0x262322,
+            roughness: 0.92,
+            metalness: 0.12
+        });
+
+        this.wallMat = new THREE.MeshStandardMaterial({
+            color: 0x1e2530,
+            roughness: 0.45,
+            metalness: 0.78
+        });
+
+        this.alarmRedMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+        this.hazardYellowMat = new THREE.MeshBasicMaterial({ color: 0xeab308 });
+
+        // Création de segments courts (6m) pour épouser parfaitement les courbes du canyon
+        for (let i = 0; i < this.numTiles; i++) {
+            const tile = this.createCanyonSegment(i % 3 === 0);
+            const zPos = 24 - i * this.tileLength;
+            tile.position.z = zPos;
+            this.alignSegmentToCurve(tile, zPos);
+            this.scene.add(tile);
+            this.floorTiles.push(tile);
+        }
+    }
+
+    createCanyonSegment(hasBeacon) {
+        const group = new THREE.Group();
+
+        // Sol large qui couvre tout le virage
+        const floor = new THREE.Mesh(new THREE.PlaneGeometry(46, this.tileLength + 0.2), this.floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.receiveShadow = true;
+        group.add(floor);
+
+        // Paroi gauche (mur blindé + roche escarpée extérieure)
+        const leftWall = new THREE.Mesh(new THREE.BoxGeometry(3.2, 4.4, this.tileLength + 0.6), this.wallMat);
+        leftWall.position.set(-12.5, 2.2, 0);
+        leftWall.castShadow = true;
+        leftWall.receiveShadow = true;
+        group.add(leftWall);
+
+        const leftRock = new THREE.Mesh(new THREE.DodecahedronGeometry(4.8, 0), this.rockMat);
+        leftRock.position.set(-16.2, 3.2, 0);
+        leftRock.scale.set(1.3, 1.4, 1.1);
+        group.add(leftRock);
+
+        // Paroi droite (mur blindé + roche escarpée extérieure)
+        const rightWall = new THREE.Mesh(new THREE.BoxGeometry(3.2, 4.4, this.tileLength + 0.6), this.wallMat);
+        rightWall.position.set(12.5, 2.2, 0);
+        rightWall.castShadow = true;
+        rightWall.receiveShadow = true;
+        group.add(rightWall);
+
+        const rightRock = new THREE.Mesh(new THREE.DodecahedronGeometry(4.8, 0), this.rockMat);
+        rightRock.position.set(16.2, 3.2, 0);
+        rightRock.scale.set(1.3, 1.4, 1.1);
+        group.add(rightRock);
+
+        // Balises lumineuses d'alerte sur les parois
+        const stripGeo = new THREE.BoxGeometry(0.3, 2.2, 0.45);
+        const stripMat = hasBeacon ? this.alarmRedMat : this.hazardYellowMat;
+        const lStrip = new THREE.Mesh(stripGeo, stripMat);
+        lStrip.position.set(-10.8, 2.1, 0);
+        group.add(lStrip);
+
+        const rStrip = new THREE.Mesh(stripGeo, stripMat);
+        rStrip.position.set(10.8, 2.1, 0);
+        group.add(rStrip);
+
+        group.userData = { leftWall, rightWall, leftRock, rightRock, lStrip, rStrip };
+        return group;
+    }
+
+    alignSegmentToCurve(tile, screenZ) {
+        const worldZ = screenZ - this.worldScrollZ;
+        const cx = this.getCanyonCenterX(worldZ);
+        const hw = this.getCanyonHalfWidth(worldZ);
+        const slope = (this.getCanyonCenterX(worldZ - 2.0) - this.getCanyonCenterX(worldZ + 2.0)) / 4.0;
+        const angleY = Math.atan(slope);
+
+        const u = tile.userData;
+        u.leftWall.position.x = cx - hw - 1.6;
+        u.leftWall.rotation.y = angleY;
+        u.leftRock.position.x = cx - hw - 5.2;
+
+        u.rightWall.position.x = cx + hw + 1.6;
+        u.rightWall.rotation.y = angleY;
+        u.rightRock.position.x = cx + hw + 5.2;
+
+        u.lStrip.position.x = cx - hw + 0.05;
+        u.rStrip.position.x = cx + hw - 0.05;
+    }
+
+    /**
+     * Modélisation 3D réaliste et articulée du Soldat Clone Millennium
+     */
+    createPlayerMesh() {
+        this.playerGroup = new THREE.Group();
+
+        const titaniumMat = new THREE.MeshStandardMaterial({
+            color: 0x334155,
+            roughness: 0.32,
+            metalness: 0.82
+        });
+        const tacticalBlueMat = new THREE.MeshStandardMaterial({
+            color: 0x1d4ed8,
+            roughness: 0.38,
+            metalness: 0.65
+        });
+        const carbonSuitMat = new THREE.MeshStandardMaterial({
+            color: 0x0f172a,
+            roughness: 0.75,
+            metalness: 0.25
+        });
+        const visorMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+        const skinMat = new THREE.MeshStandardMaterial({
+            color: 0xc9976a,
+            roughness: 0.85,
+            metalness: 0.05
+        });
+        const weaponMat = new THREE.MeshStandardMaterial({
+            color: 0x1e293b,
+            roughness: 0.25,
+            metalness: 0.92
+        });
+
+        // Bassin articulé (indépendant du torse pour courir dans une direction et viser dans une autre)
+        this.hipsGroup = new THREE.Group();
+        this.hipsGroup.position.y = 0.95;
+        this.playerGroup.add(this.hipsGroup);
+
+        const pelvis = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.28, 0.48), carbonSuitMat);
+        this.hipsGroup.add(pelvis);
+
+        // Jambe gauche (cuisse + genouillère + tibia + botte lourde)
+        this.leftLegPivot = new THREE.Group();
+        this.leftLegPivot.position.set(-0.24, -0.05, 0);
+        this.hipsGroup.add(this.leftLegPivot);
+
+        const lThigh = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.46, 0.32), tacticalBlueMat);
+        lThigh.position.y = -0.22;
+        lThigh.castShadow = true;
+        this.leftLegPivot.add(lThigh);
+
+        const lKnee = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.16, 0.36), titaniumMat);
+        lKnee.position.set(0, -0.45, -0.03);
+        this.leftLegPivot.add(lKnee);
+
+        const lShin = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.44, 0.30), titaniumMat);
+        lShin.position.y = -0.68;
+        lShin.castShadow = true;
+        this.leftLegPivot.add(lShin);
+
+        const lBoot = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.16, 0.46), carbonSuitMat);
+        lBoot.position.set(0, -0.86, -0.07);
+        this.leftLegPivot.add(lBoot);
+
+        // Jambe droite
+        this.rightLegPivot = new THREE.Group();
+        this.rightLegPivot.position.set(0.24, -0.05, 0);
+        this.hipsGroup.add(this.rightLegPivot);
+
+        const rThigh = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.46, 0.32), tacticalBlueMat);
+        rThigh.position.y = -0.22;
+        rThigh.castShadow = true;
+        this.rightLegPivot.add(rThigh);
+
+        const rKnee = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.16, 0.36), titaniumMat);
+        rKnee.position.set(0, -0.45, -0.03);
+        this.rightLegPivot.add(rKnee);
+
+        const rShin = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.44, 0.30), titaniumMat);
+        rShin.position.y = -0.68;
+        rShin.castShadow = true;
+        this.rightLegPivot.add(rShin);
+
+        const rBoot = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.16, 0.46), carbonSuitMat);
+        rBoot.position.set(0, -0.86, -0.07);
+        this.rightLegPivot.add(rBoot);
+
+        // Torse supérieur orienté vers le curseur de visée
+        this.torsoGroup = new THREE.Group();
+        this.torsoGroup.position.y = 1.12;
+        this.playerGroup.add(this.torsoGroup);
+
+        // Abdomen blindé + Plastron pectoral
+        const abdomen = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.34, 0.44), carbonSuitMat);
+        abdomen.position.y = 0.14;
+        this.torsoGroup.add(abdomen);
+
+        const chestPlate = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.56, 0.58), tacticalBlueMat);
+        chestPlate.position.set(0, 0.48, -0.02);
+        chestPlate.castShadow = true;
+        this.torsoGroup.add(chestPlate);
+
+        const sternumArmor = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.42, 0.64), titaniumMat);
+        sternumArmor.position.set(0, 0.48, -0.03);
+        this.torsoGroup.add(sternumArmor);
+
+        // Sac à dos énergétique avec réacteurs bleus et antenne tactique
+        const backpack = new THREE.Mesh(new THREE.BoxGeometry(0.64, 0.66, 0.36), titaniumMat);
+        backpack.position.set(0, 0.46, 0.42);
+        this.torsoGroup.add(backpack);
+
+        const thrusterL = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.14, 0.24, 10), visorMat);
+        thrusterL.position.set(-0.18, 0.24, 0.56);
+        thrusterL.rotation.x = 0.35;
+        this.torsoGroup.add(thrusterL);
+
+        const thrusterR = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.14, 0.24, 10), visorMat);
+        thrusterR.position.set(0.18, 0.24, 0.56);
+        thrusterR.rotation.x = 0.35;
+        this.torsoGroup.add(thrusterR);
+
+        const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.03, 0.65, 6), titaniumMat);
+        antenna.position.set(0.26, 0.98, 0.5);
+        this.torsoGroup.add(antenna);
+
+        // Épaulières blindées profilées
+        const lShoulder = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.36, 0.50), titaniumMat);
+        lShoulder.position.set(-0.62, 0.64, 0);
+        lShoulder.rotation.z = 0.22;
+        this.torsoGroup.add(lShoulder);
+
+        const rShoulder = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.36, 0.50), titaniumMat);
+        rShoulder.position.set(0.62, 0.64, 0);
+        rShoulder.rotation.z = -0.22;
+        this.torsoGroup.add(rShoulder);
+
+        // Cou charnu visible sous le casque (soldat humain réaliste)
+        const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.16, 0.2, 10), skinMat);
+        neck.position.set(0, 0.7, 0);
+        this.torsoGroup.add(neck);
+
+        // Mâchoire / bas du visage exposé sous la visière panoramique
+        const jawHuman = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.14, 0.22), skinMat);
+        jawHuman.position.set(0, 0.8, -0.26);
+        this.torsoGroup.add(jawHuman);
+
+        // Casque tactique profilé avec visière panoramique cyan et lampe torche latérale
+        const helmet = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.46, 0.50), titaniumMat);
+        helmet.position.set(0, 0.98, -0.02);
+        helmet.castShadow = true;
+        this.torsoGroup.add(helmet);
+
+        const helmetCrest = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.12, 0.54), tacticalBlueMat);
+        helmetCrest.position.set(0, 1.22, -0.02);
+        this.torsoGroup.add(helmetCrest);
+
+        const visor = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.15, 0.10), visorMat);
+        visor.position.set(0, 0.99, -0.25);
+        this.torsoGroup.add(visor);
+
+        const lampPod = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.18, 8), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+        lampPod.rotation.x = Math.PI / 2;
+        lampPod.position.set(0.26, 1.02, -0.18);
+        this.torsoGroup.add(lampPod);
+
+        // Bras articulés tenant le fusil d'assaut lourd futuriste à deux mains
+        const lArm = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.62), carbonSuitMat);
+        lArm.position.set(-0.48, 0.42, -0.28);
+        lArm.rotation.y = -0.32;
+        this.torsoGroup.add(lArm);
+
+        const rArm = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.56), carbonSuitMat);
+        rArm.position.set(0.48, 0.42, -0.24);
+        this.torsoGroup.add(rArm);
+
+        // Fusil d'assaut lourd modulaire (corps + double canon + chargeur + viseur holographique)
+        this.rifleGroup = new THREE.Group();
+        this.rifleGroup.position.set(0.22, 0.42, -0.58);
+        this.torsoGroup.add(this.rifleGroup);
+
+        const rifleBody = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.24, 0.95), weaponMat);
+        rifleBody.castShadow = true;
+        this.rifleGroup.add(rifleBody);
+
+        const barrelTop = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.55, 8), titaniumMat);
+        barrelTop.rotation.x = Math.PI / 2;
+        barrelTop.position.set(0, 0.05, -0.65);
+        this.rifleGroup.add(barrelTop);
+
+        const barrelBot = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.45, 8), titaniumMat);
+        barrelBot.rotation.x = Math.PI / 2;
+        barrelBot.position.set(0, -0.05, -0.58);
+        this.rifleGroup.add(barrelBot);
+
+        const holoSight = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.10, 0.18), visorMat);
+        holoSight.position.set(0, 0.16, -0.15);
+        this.rifleGroup.add(holoSight);
+
+        // Bouclier énergétique sphérique
+        const shieldGeo = new THREE.SphereGeometry(1.45, 18, 14);
+        const shieldMat = new THREE.MeshBasicMaterial({
+            color: 0x38bdf8,
+            transparent: true,
+            opacity: 0.10,
+            wireframe: true
+        });
+        this.shieldMesh = new THREE.Mesh(shieldGeo, shieldMat);
+        this.shieldMesh.position.y = 1.25;
+        this.playerGroup.add(this.shieldMesh);
+
+        this.scene.add(this.playerGroup);
+
+        // Ligne de visée laser tactique + Réticule au sol
+        const laserGeo = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(0, 1.4, 0),
+            new THREE.Vector3(0, 1.4, -10)
+        ]);
+        const laserMat = new THREE.LineBasicMaterial({
+            color: 0xef4444,
+            transparent: true,
+            opacity: 0.72
+        });
+        this.aimLaser = new THREE.Line(laserGeo, laserMat);
+        this.scene.add(this.aimLaser);
+
+        const reticleGeo = new THREE.RingGeometry(0.42, 0.62, 24);
+        const reticleMat = new THREE.MeshBasicMaterial({
+            color: 0xef4444,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.9
+        });
+        this.reticleMesh = new THREE.Mesh(reticleGeo, reticleMat);
+        this.reticleMesh.rotation.x = -Math.PI / 2;
+        this.reticleMesh.position.y = 0.08;
+        this.scene.add(this.reticleMesh);
+    }
+
+    /**
+     * Réinitialisation complète pour démarrer une nouvelle mission
+     */
+    startGame() {
+        this.audio.init();
+        this.audio.startMusic();
+
+        [
+            ...this.bullets,
+            ...this.enemyBullets,
+            ...this.enemies,
+            ...this.obstacles,
+            ...this.props,
+            ...this.pickups,
+            ...this.particles,
+            ...this.bloodPools
+        ].forEach(obj => {
+            if (obj.mesh) this.scene.remove(obj.mesh);
+        });
+        if (this.boss && this.boss.mesh) {
+            this.scene.remove(this.boss.mesh);
+        }
+
+        this.bullets = [];
+        this.enemyBullets = [];
+        this.enemies = [];
+        this.obstacles = [];
+        this.props = [];
+        this.pickups = [];
+        this.particles = [];
+        this.bloodPools = [];
+        this.boss = null;
+        this.bossSpawned = false;
+        this.worldScrollZ = 0;
+
+        // Réalignement des segments du canyon
+        for (let i = 0; i < this.numTiles; i++) {
+            const tile = this.floorTiles[i];
+            const zPos = 24 - i * this.tileLength;
+            tile.position.z = zPos;
+            this.alignSegmentToCurve(tile, zPos);
+        }
+
+        const startCenterX = this.getCanyonCenterX(5);
+        this.player = {
+            x: startCenterX,
+            z: 5,
+            speed: 14.2,
+            hp: 100,
+            maxHp: 100,
+            shield: 100,
+            maxShield: 100,
+            shieldRegenDelay: 0,
+            dashEnergy: 100,
+            dashTimer: 0,
+            dashDirX: 0,
+            dashDirZ: -1,
+            bombs: 3,
+            maxBombs: 5,
+            weapon: 'PULSE',
+            ammo: Infinity,
+            maxAmmo: Infinity,
+            fireTimer: 0,
+            invulnTimer: 0,
+            animTime: 0
+        };
+
+        this.score = 0;
+        this.combo = 1;
+        this.comboTimer = 0;
+        this.kills = 0;
+        this.sector = 1;
+        this.sectorDistance = 0;
+        this.sectorGoal = 260;
+        this.maxSectors = DIFFICULTY_SETTINGS[this.difficulty].sectors;
+        this.spawnTimer = 0.8;
+        this.propSpawnTimer = 0.6;
+        this.obstacleSpawnTimer = 0.2;
+        this.surpriseTimer = 9.0; // Première surprise du parcours
+
+        this.playerGroup.position.set(this.player.x, 0, this.player.z);
+        this.playerGroup.visible = true;
+        this.aimLaser.visible = true;
+        this.reticleMesh.visible = true;
+
+        this.ui.startScreen.classList.add('hidden');
+        this.ui.endScreen.classList.add('hidden');
+        this.ui.bossHud.style.display = 'none';
+        this.ui.hud.classList.remove('hidden');
+
+        this.state = 'PLAYING';
+        this.showBanner(`NIVEAU 01/${this.maxSectors} // INFILTRATION DU CANYON`);
+        this.updateHUD();
+
+        // Génération initiale d'abris tactiques et de caisses sur le chemin
+        for (let z = -10; z >= -52; z -= 14) {
+            this.spawnTacticalObstacle(z);
+            this.spawnProp(z - 6);
+        }
+    }
+
+    showBanner(text) {
+        this.ui.tacticalBanner.textContent = text;
+        this.ui.tacticalBanner.classList.add('active');
+        clearTimeout(this.bannerTimeout);
+        this.bannerTimeout = setTimeout(() => {
+            this.ui.tacticalBanner.classList.remove('active');
+        }, 2100);
+    }
+
+    triggerFlash(color, opacity = 0.45) {
+        this.ui.screenFlash.style.backgroundColor = color;
+        this.ui.screenFlash.style.opacity = opacity;
+        setTimeout(() => {
+            this.ui.screenFlash.style.opacity = 0;
+        }, 90);
+    }
+
+    bindEvents() {
+        window.addEventListener('resize', () => {
+            this.camera.aspect = window.innerWidth / window.innerHeight;
+            this.camera.updateProjectionMatrix();
+            this.renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        window.addEventListener('keydown', (e) => {
+            const code = e.code;
+            this.keys[code] = true;
+
+            if (code === 'KeyC') {
+                this.toggleCheat();
+                return;
+            }
+
+            if (code === 'KeyP' && (this.state === 'PLAYING' || this.state === 'PAUSED')) {
+                this.togglePause();
+                return;
+            }
+
+            if (this.state === 'PLAYING') {
+                if (code === 'Space' || code === 'ShiftLeft' || code === 'ShiftRight') {
+                    e.preventDefault();
+                    this.triggerDash();
+                }
+                if (code === 'KeyE') {
+                    this.useSmartBomb();
+                }
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            this.keys[e.code] = false;
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            this.mouseNDC.x = (e.clientX / window.innerWidth) * 2 - 1;
+            this.mouseNDC.y = -(e.clientY / window.innerHeight) * 2 + 1;
+        });
+
+        window.addEventListener('mousedown', (e) => {
+            if (this.state !== 'PLAYING') return;
+            if (e.target.closest('button')) return;
+
+            if (e.button === 0) {
+                this.isFiring = true;
+            } else if (e.button === 2) {
+                this.useSmartBomb();
+            }
+        });
+
+        window.addEventListener('mouseup', (e) => {
+            if (e.button === 0) {
+                this.isFiring = false;
+            }
+        });
+
+        window.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        document.querySelectorAll('.diff-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+                this.difficulty = btn.dataset.diff;
+            });
+        });
+
+        document.getElementById('start-btn').addEventListener('click', () => this.startGame());
+        document.getElementById('restart-btn').addEventListener('click', () => this.startGame());
+        document.getElementById('cheat-btn').addEventListener('click', () => this.toggleCheat());
+
+        const audioBtn = document.getElementById('audio-toggle');
+        audioBtn.addEventListener('click', () => {
+            const on = this.audio.toggle();
+            audioBtn.textContent = `AUDIO : ${on ? 'ON' : 'OFF'}`;
+        });
+
+        const pauseBtn = document.getElementById('pause-toggle');
+        pauseBtn.addEventListener('click', () => this.togglePause());
+    }
+
+    toggleCheat() {
+        this.cheatMode = !this.cheatMode;
+        const btn = document.getElementById('cheat-btn');
+        if (btn) {
+            btn.textContent = this.cheatMode ? '☢ MODE CHEAT : ACTIVÉ [C]' : '☢ MODE CHEAT : DÉSACTIVÉ [C]';
+            btn.style.background = this.cheatMode ? '#7e22ce' : 'rgba(15, 23, 42, 0.85)';
+        }
+        if (this.cheatMode) {
+            this.showBanner('☢ MODE CHEAT ACTIVÉ // INVULNÉRABILITÉ TOTALE');
+            this.triggerFlash('#a855f7', 0.4);
+            if (this.player) {
+                this.player.hp = this.player.maxHp;
+                this.player.shield = this.player.maxShield;
+                this.player.bombs = this.player.maxBombs;
+            }
+            this.audio.playPowerup();
+        } else {
+            this.showBanner('MODE CHEAT DÉSACTIVÉ // BONNE CHANCE CLONE');
+        }
+        if (this.player) this.updateHUD();
+    }
+
+    togglePause() {
+        if (this.state === 'PLAYING') {
+            this.state = 'PAUSED';
+            document.getElementById('pause-toggle').textContent = 'REPRENDRE [P]';
+            this.showBanner('SIMULATION EN PAUSE');
+        } else if (this.state === 'PAUSED') {
+            this.state = 'PLAYING';
+            document.getElementById('pause-toggle').textContent = 'PAUSE [P]';
+            this.clock.getDelta(); // Évite un saut de temps
+        }
+    }
+
+    /**
+     * Propulseur Dash Tactique (Esquive rapide avec invulnérabilité brève)
+     */
+    triggerDash() {
+        const p = this.player;
+        if (p.dashEnergy < 45 || p.dashTimer > 0) return;
+
+        let dx = 0;
+        let dz = 0;
+        if (this.keys['KeyA'] || this.keys['ArrowLeft']) dx -= 1;
+        if (this.keys['KeyD'] || this.keys['ArrowRight']) dx += 1;
+        if (this.keys['KeyW'] || this.keys['ArrowUp']) dz -= 1;
+        if (this.keys['KeyS'] || this.keys['ArrowDown']) dz += 1;
+
+        if (dx === 0 && dz === 0) {
+            // Dash dans la direction de visée si immobile
+            const ang = this.torsoGroup.rotation.y;
+            dx = -Math.sin(ang);
+            dz = -Math.cos(ang);
+        } else {
+            const len = Math.hypot(dx, dz);
+            dx /= len;
+            dz /= len;
+        }
+
+        p.dashEnergy -= 45;
+        p.dashTimer = 0.22;
+        p.invulnTimer = 0.28;
+        p.dashDirX = dx;
+        p.dashDirZ = dz;
+
+        this.audio.playDash();
+        this.spawnExplosion(p.x, 0.9, p.z, 0x38bdf8, 10, 0.7);
+        this.updateHUD();
+    }
+
+    useSmartBomb() {
+        if (this.state !== 'PLAYING') return;
+        if (!this.cheatMode && this.player.bombs <= 0) return;
+        if (!this.cheatMode) this.player.bombs--;
+        this.audio.playSmartBomb();
+        this.screenShake = 1.45;
+        this.hitStopTimer = 0.06;
+        this.triggerFlash('#ffffff', 0.75);
+        this.showBanner('SMART BOMB DÉPLOYÉE !');
+
+        const ringGeo = new THREE.RingGeometry(0.5, 2.4, 36);
+        const ringMat = new THREE.MeshBasicMaterial({
+            color: 0x38bdf8,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.95
+        });
+        const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+        ringMesh.rotation.x = -Math.PI / 2;
+        ringMesh.position.set(this.player.x, 0.3, this.player.z);
+        this.scene.add(ringMesh);
+        this.particles.push({
+            mesh: ringMesh,
+            type: 'SHOCKWAVE',
+            life: 0.55,
+            maxLife: 0.55
+        });
+
+        this.enemyBullets.forEach(b => this.scene.remove(b.mesh));
+        this.enemyBullets = [];
+
+        for (let i = this.enemies.length - 1; i >= 0; i--) {
+            this.damageEnemy(this.enemies[i], 320, i);
+        }
+
+        for (let i = this.props.length - 1; i >= 0; i--) {
+            this.destroyProp(this.props[i], i);
+        }
+
+        if (this.boss) {
+            this.damageBoss(250);
+        }
+
+        this.updateHUD();
+    }
+
+    /**
+     * Système de tir du joueur depuis le canon du fusil d'assaut
+     */
+    firePlayerWeapon() {
+        const w = WEAPONS[this.player.weapon];
+        this.player.fireTimer = w.fireRate;
+        this.audio.playShoot(this.player.weapon);
+
+        const angle = this.torsoGroup.rotation.y;
+        const dirX = -Math.sin(angle);
+        const dirZ = -Math.cos(angle);
+        const spawnX = this.player.x + dirX * 1.35;
+        const spawnZ = this.player.z + dirZ * 1.35;
+
+        this.muzzleLight.color.setHex(w.color);
+        this.muzzleLight.intensity = 3.8;
+        this.muzzleLight.position.set(spawnX, 1.7, spawnZ);
+
+        // Recul réaliste du fusil d'assaut dans les mains
+        this.rifleGroup.position.z = -0.34;
+
+        if (this.player.weapon === 'PULSE') {
+            this.spawnPlayerBullet(spawnX, spawnZ, angle + (Math.random() - 0.5) * 0.04, w.speed, w.damage, w.color, 0.22, 1.35);
+        } else if (this.player.weapon === 'SPREAD') {
+            const spreads = [-0.30, -0.15, 0, 0.15, 0.30];
+            spreads.forEach(offset => {
+                this.spawnPlayerBullet(spawnX, spawnZ, angle + offset, w.speed, w.damage, w.color, 0.25, 1.0);
+            });
+        } else if (this.player.weapon === 'LASER') {
+            this.spawnPlayerBullet(spawnX, spawnZ, angle, w.speed, w.damage, w.color, 0.30, 3.8, true);
+        } else if (this.player.weapon === 'MISSILE') {
+            this.spawnPlayerBullet(spawnX - 0.35, spawnZ, angle + 0.16, w.speed, w.damage, w.color, 0.34, 1.25, false, true);
+            this.spawnPlayerBullet(spawnX + 0.35, spawnZ, angle - 0.16, w.speed, w.damage, w.color, 0.34, 1.25, false, true);
+        }
+
+        if (!w.infinite) {
+            this.player.ammo--;
+            if (this.player.ammo <= 0) {
+                this.player.weapon = 'PULSE';
+                this.player.ammo = Infinity;
+                this.showBanner('MUNITIONS ÉPUISÉES // FUSIL D\'ASSAUT');
+            }
+            this.updateHUD();
+        }
+    }
+
+    spawnPlayerBullet(x, z, angle, speed, damage, color, radius, length, piercing = false, homing = false) {
+        const geo = new THREE.BoxGeometry(radius, radius, length);
+        const mat = new THREE.MeshBasicMaterial({ color: color });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(x, 1.45, z);
+        mesh.rotation.y = angle;
+        this.scene.add(mesh);
+
+        this.bullets.push({
+            mesh,
+            x,
+            z,
+            vx: -Math.sin(angle) * speed,
+            vz: -Math.cos(angle) * speed,
+            speed,
+            damage,
+            piercing,
+            homing,
+            life: 1.45
+        });
+    }
+
+    /**
+     * ÉVÉNEMENTS SURPRISE du parcours : bonnes (largage de ravitaillement) ou mauvaises (embuscade xéno mortelle)
+     */
+    triggerSurprise() {
+        const worldZ = -34 - this.worldScrollZ;
+        const cx = this.getCanyonCenterX(worldZ);
+        const hw = this.getCanyonHalfWidth(worldZ);
+        const good = Math.random() < 0.45;
+
+        if (good) {
+            // BONNE SURPRISE : largage aérien de ravitaillement en ligne
+            this.audio.playPowerup();
+            this.showBanner('🎁 LARGAGE ALLIÉ // CAISSES DE RAVITAILLEMENT !');
+            this.triggerFlash('#22c55e', 0.25);
+            for (let i = 0; i < 4; i++) {
+                this.spawnPickup(cx + (Math.random() * 2 - 1) * (hw - 3), -34 - i * 3.2);
+            }
+        } else if (Math.random() < 0.55) {
+            // MAUVAISE SURPRISE : embuscade d'une meute xéno
+            this.audio.playMonsterRoar(0.7);
+            this.screenShake = Math.max(this.screenShake, 0.8);
+            this.triggerFlash('#ef4444', 0.4);
+            this.showBanner('⚠ EMBUSCADE XÉNO // MEUTE FÉROCE !');
+            for (let i = 0; i < 5; i++) {
+                this.spawnEnemy(-36 - i * 3.4, cx + (Math.random() * 2 - 1) * (hw - 2.6));
+            }
+        } else {
+            // MAUVAISE SURPRISE : champ de mines organiques (barils à haute instabilité)
+            this.audio.playMonsterRoar(1.0);
+            this.showBanner('⚠ DANGER // CHAMP DE MINES ORGANIQUES !');
+            for (let i = 0; i < 5; i++) {
+                this.spawnProp(-36 - i * 2.6);
+            }
+            for (let i = 0; i < 3; i++) {
+                this.spawnPickup(cx + (Math.random() * 2 - 1) * (hw - 3), -36 - i * 5.2);
+            }
+        }
+    }
+
+    /**
+     * Génération d'obstacles tactiques (Bunkers béton, piliers rocheux, barricades)
+     * Permettent au joueur de se protéger des tirs ennemis et de contourner les monstres
+     */
+    spawnTacticalObstacle(zPos = -54) {
+        const worldZ = zPos - this.worldScrollZ;
+        const cx = this.getCanyonCenterX(worldZ);
+        const hw = this.getCanyonHalfWidth(worldZ);
+
+        // Placement décalé à gauche, au centre ou à droite pour créer un slalom tactique
+        const lane = (Math.random() * 2 - 1) * (hw - 3.6);
+        const xPos = cx + lane;
+
+        const kind = Math.floor(Math.random() * 3);
+        const group = new THREE.Group();
+        let halfW = 1.6;
+        let halfD = 1.1;
+
+        const concreteMat = new THREE.MeshStandardMaterial({
+            color: 0x3f3f46,
+            roughness: 0.85,
+            metalness: 0.25
+        });
+        const rustMetalMat = new THREE.MeshStandardMaterial({
+            color: 0x451a03,
+            roughness: 0.65,
+            metalness: 0.7
+        });
+        const stripeMat = new THREE.MeshBasicMaterial({ color: 0xeab308 });
+
+        if (kind === 0) {
+            // Bunker de couverture en béton armé avec meurtrière
+            halfW = 2.1;
+            halfD = 1.05;
+            const base = new THREE.Mesh(new THREE.BoxGeometry(halfW * 2, 2.2, halfD * 2), concreteMat);
+            base.position.y = 1.1;
+            base.castShadow = true;
+            base.receiveShadow = true;
+            group.add(base);
+
+            const cap = new THREE.Mesh(new THREE.BoxGeometry(halfW * 2.1, 0.35, halfD * 2.15), rustMetalMat);
+            cap.position.y = 2.3;
+            group.add(cap);
+
+            const trim = new THREE.Mesh(new THREE.BoxGeometry(halfW * 1.8, 0.16, halfD * 2.04), stripeMat);
+            trim.position.y = 1.7;
+            group.add(trim);
+        } else if (kind === 1) {
+            // Pilier rocheux massif du canyon
+            halfW = 1.55;
+            halfD = 1.55;
+            const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(1.9, 1), this.rockMat);
+            rock.position.y = 1.6;
+            rock.scale.set(1.0, 1.35, 1.0);
+            rock.castShadow = true;
+            rock.receiveShadow = true;
+            group.add(rock);
+        } else {
+            // Barricade industrielle blindée avec générateur
+            halfW = 1.85;
+            halfD = 0.95;
+            const wall = new THREE.Mesh(new THREE.BoxGeometry(halfW * 2, 1.85, halfD * 2), rustMetalMat);
+            wall.position.y = 0.925;
+            wall.castShadow = true;
+            wall.receiveShadow = true;
+            group.add(wall);
+
+            const coil = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 2.4, 10), concreteMat);
+            coil.position.set(-halfW + 0.5, 1.2, 0);
+            group.add(coil);
+        }
+
+        group.position.set(xPos, 0, zPos);
+        this.scene.add(group);
+
+        this.obstacles.push({
+            mesh: group,
+            x: xPos,
+            z: zPos,
+            halfW,
+            halfD
+        });
+    }
+
+    /**
+     * Vérifie si un point (x, z) avec un rayon r entre en collision avec un obstacle ou les parois du canyon
+     */
+    resolveWorldCollision(pos, radius) {
+        // 1. Parois sinueuses du canyon
+        const worldZ = pos.z - this.worldScrollZ;
+        const cx = this.getCanyonCenterX(worldZ);
+        const hw = this.getCanyonHalfWidth(worldZ) - radius;
+        if (pos.x < cx - hw) pos.x = cx - hw;
+        if (pos.x > cx + hw) pos.x = cx + hw;
+
+        // 2. Obstacles tactiques (résolution AABB avec glissement fluide)
+        for (const obs of this.obstacles) {
+            const dx = pos.x - obs.x;
+            const dz = pos.z - obs.z;
+            const overlapX = (obs.halfW + radius) - Math.abs(dx);
+            const overlapZ = (obs.halfD + radius) - Math.abs(dz);
+
+            if (overlapX > 0 && overlapZ > 0) {
+                if (overlapX < overlapZ) {
+                    pos.x += dx >= 0 ? overlapX : -overlapX;
+                } else {
+                    pos.z += dz >= 0 ? overlapZ : -overlapZ;
+                }
+            }
+        }
+    }
+
+    /**
+     * Vérifie si un projectile percute un mur du canyon ou un obstacle solide
+     */
+    checkBulletBlockedByCover(x, z, radius = 0.25) {
+        const worldZ = z - this.worldScrollZ;
+        const cx = this.getCanyonCenterX(worldZ);
+        const hw = this.getCanyonHalfWidth(worldZ);
+        if (Math.abs(x - cx) > hw) return true;
+
+        for (const obs of this.obstacles) {
+            if (Math.abs(x - obs.x) < obs.halfW + radius && Math.abs(z - obs.z) < obs.halfD + radius) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Génération des caisses de ravitaillement et barils explosifs dans le canyon sinueux
+     */
+    spawnProp(zPos = -52) {
+        const worldZ = zPos - this.worldScrollZ;
+        const cx = this.getCanyonCenterX(worldZ);
+        const hw = this.getCanyonHalfWidth(worldZ);
+
+        const isBarrel = Math.random() < 0.48;
+        const xPos = cx + (Math.random() * 2 - 1) * (hw - 2.2);
+
+        // Évite de spawner à l'intérieur d'un obstacle
+        for (const obs of this.obstacles) {
+            if (Math.abs(xPos - obs.x) < obs.halfW + 1.4 && Math.abs(zPos - obs.z) < obs.halfD + 1.4) {
+                return;
+            }
+        }
+
+        let mesh;
+        if (isBarrel) {
+            const geo = new THREE.CylinderGeometry(0.65, 0.65, 1.55, 12);
+            const mat = new THREE.MeshStandardMaterial({
+                color: 0xdc2626,
+                emissive: 0x500707,
+                roughness: 0.35,
+                metalness: 0.65
+            });
+            mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(xPos, 0.78, zPos);
+        } else {
+            const geo = new THREE.BoxGeometry(1.4, 1.4, 1.4);
+            const mat = new THREE.MeshStandardMaterial({
+                color: 0xd97706,
+                emissive: 0x291502,
+                roughness: 0.5,
+                metalness: 0.45
+            });
+            mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(xPos, 0.7, zPos);
+        }
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        this.scene.add(mesh);
+
+        this.props.push({
+            mesh,
+            x: xPos,
+            z: zPos,
+            hp: isBarrel ? 18 : 28,
+            isBarrel
+        });
+    }
+
+    destroyProp(prop, index) {
+        this.scene.remove(prop.mesh);
+        this.props.splice(index, 1);
+
+        if (prop.isBarrel) {
+            this.audio.playExplosion(1.5);
+            this.screenShake = Math.max(this.screenShake, 0.72);
+            this.spawnExplosion(prop.x, 1.0, prop.z, 0xf97316, 24, 1.55);
+
+            const blastRadius = 7.0;
+            for (let i = this.enemies.length - 1; i >= 0; i--) {
+                const e = this.enemies[i];
+                if (Math.hypot(e.x - prop.x, e.z - prop.z) < blastRadius) {
+                    this.damageEnemy(e, 165, i);
+                }
+            }
+            if (this.boss && Math.hypot(this.boss.x - prop.x, this.boss.z - prop.z) < blastRadius + 3.2) {
+                this.damageBoss(130);
+            }
+        } else {
+            this.audio.playExplosion(0.6);
+            this.spawnExplosion(prop.x, 0.8, prop.z, 0xfacc15, 10, 0.8);
+            this.spawnPickup(prop.x, prop.z);
+        }
+    }
+
+    spawnPickup(x, z) {
+        const types = ['SPREAD', 'LASER', 'MISSILE', 'SHIELD', 'HEAL', 'BOMB'];
+        const weights = [0.24, 0.22, 0.20, 0.16, 0.11, 0.07];
+        let r = Math.random();
+        let chosen = 'SPREAD';
+        for (let i = 0; i < types.length; i++) {
+            if (r < weights[i]) {
+                chosen = types[i];
+                break;
+            }
+            r -= weights[i];
+        }
+
+        const colorMap = {
+            SPREAD: 0xf97316,
+            LASER: 0x38bdf8,
+            MISSILE: 0xef4444,
+            SHIELD: 0x0ea5e9,
+            HEAL: 0x22c55e,
+            BOMB: 0xfacc15
+        };
+
+        const group = new THREE.Group();
+        const core = new THREE.Mesh(
+            new THREE.OctahedronGeometry(0.65, 0),
+            new THREE.MeshStandardMaterial({
+                color: colorMap[chosen],
+                emissive: colorMap[chosen],
+                emissiveIntensity: 0.7,
+                roughness: 0.2
+            })
+        );
+        group.add(core);
+
+        const ring = new THREE.Mesh(
+            new THREE.RingGeometry(0.75, 0.92, 20),
+            new THREE.MeshBasicMaterial({ color: colorMap[chosen], side: THREE.DoubleSide })
+        );
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.y = -0.5;
+        group.add(ring);
+
+        group.position.set(x, 0.9, z);
+        this.scene.add(group);
+
+        this.pickups.push({
+            mesh: group,
+            x,
+            z,
+            type: chosen,
+            time: 0
+        });
+    }
+
+    applyPickup(pickup) {
+        this.audio.playPowerup();
+        this.addScore(250);
+
+        switch (pickup.type) {
+            case 'SPREAD':
+            case 'LASER':
+            case 'MISSILE':
+                this.player.weapon = pickup.type;
+                this.player.ammo = WEAPONS[pickup.type].maxAmmo;
+                this.player.maxAmmo = WEAPONS[pickup.type].maxAmmo;
+                this.showBanner(`ARME : ${WEAPONS[pickup.type].name}`);
+                break;
+            case 'SHIELD':
+                this.player.shield = this.player.maxShield;
+                this.showBanner('BOUCLIER PLASMA RECHARGÉ À 100%');
+                break;
+            case 'HEAL':
+                this.player.hp = Math.min(this.player.maxHp, this.player.hp + 45);
+                this.showBanner('NANO-RÉPARATION EXOSQUELETTE');
+                break;
+            case 'BOMB':
+                this.player.bombs = Math.min(this.player.maxBombs, this.player.bombs + 1);
+                this.showBanner('SMART BOMB SUPPLÉMENTAIRE +1');
+                break;
+        }
+        this.updateHUD();
+    }
+
+    /**
+     * Création de monstres biomécaniques gores, costauds et effrayants
+     */
+    spawnEnemy(zPos = -50, forcedX = null) {
+        const diff = DIFFICULTY_SETTINGS[this.difficulty];
+        const worldZ = zPos - this.worldScrollZ;
+        const cx = this.getCanyonCenterX(worldZ);
+        const hw = this.getCanyonHalfWidth(worldZ);
+        const xPos = forcedX !== null ? forcedX : cx + (Math.random() * 2 - 1) * (hw - 2.2);
+
+        const roll = Math.random();
+        let type = 'SWARMER'; // Grouilleur Xéno-Boucher
+        if (roll > 0.85) type = 'REAPER'; // Écorcheur Spectral (prédateur cauchemardesque)
+        else if (roll > 0.66) type = 'JUGGERNAUT'; // Colosse Biomécanique
+        else if (roll > 0.34) type = 'SPITTER'; // Abomination Cracheuse
+
+        const group = new THREE.Group();
+
+        // Matériaux organiques / gores partagés
+        const flayedFleshMat = new THREE.MeshStandardMaterial({
+            color: 0x7f1d1d,
+            emissive: 0x2b0505,
+            roughness: 0.35,
+            metalness: 0.15
+        });
+        const chitinMat = new THREE.MeshStandardMaterial({
+            color: 0x18181b,
+            roughness: 0.4,
+            metalness: 0.65
+        });
+        const boneMat = new THREE.MeshStandardMaterial({
+            color: 0xe7e5e4,
+            roughness: 0.5
+        });
+        const acidSacMat = new THREE.MeshStandardMaterial({
+            color: 0x65a30d,
+            emissive: 0x365314,
+            emissiveIntensity: 0.7,
+            roughness: 0.25
+        });
+        const monsterEyeMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+
+        let hp = 35;
+        let speed = 10.5;
+        let radius = 0.95;
+        let fireRate = 999;
+        let animParts = {};
+
+        if (type === 'SWARMER') {
+            // GROUILLEUR XÉNO-BOUCHER : Créature quadrupède voûtée à chair écorchée, crocs sanglants et griffes faux
+            hp = 50 * diff.enemyHpMult;
+            speed = 12.6 + Math.min(this.sector, 14) * 0.8;
+            radius = 0.92;
+
+            const thorax = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.65, 1.35), flayedFleshMat);
+            thorax.position.set(0, 0.68, 0);
+            thorax.rotation.x = 0.2;
+            thorax.castShadow = true;
+            group.add(thorax);
+
+            // Épines dorsales chitineuses
+            for (let s = -0.4; s <= 0.4; s += 0.4) {
+                const spine = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.55, 5), chitinMat);
+                spine.position.set(0, 1.12, s);
+                spine.rotation.x = -0.35;
+                group.add(spine);
+            }
+
+            // Crâne allongé & gueule béante avec crocs
+            const skull = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.44, 0.68), chitinMat);
+            skull.position.set(0, 0.62, 0.82);
+            group.add(skull);
+
+            const jaw = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.16, 0.58), flayedFleshMat);
+            jaw.position.set(0, 0.36, 0.80);
+            jaw.rotation.x = 0.35;
+            group.add(jaw);
+
+            // Yeux multiples luisants
+            for (const ex of [-0.18, -0.08, 0.08, 0.18]) {
+                const eye = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 6), monsterEyeMat);
+                eye.position.set(ex, 0.72, 1.15);
+                group.add(eye);
+            }
+
+            // Grandes griffes faucheuses avant
+            const lClaw = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.22, 1.1), boneMat);
+            lClaw.position.set(-0.56, 0.52, 0.65);
+            lClaw.rotation.y = 0.25;
+            group.add(lClaw);
+
+            const rClaw = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.22, 1.1), boneMat);
+            rClaw.position.set(0.56, 0.52, 0.65);
+            rClaw.rotation.y = -0.25;
+            group.add(rClaw);
+
+            animParts = { lClaw, rClaw, jaw };
+
+        } else if (type === 'SPITTER') {
+            // ABOMINATION CRACHEUSE : Bossue, sacs d'acide verts pulsants sur le dos, tentacules et mâchoire décrochée
+            hp = 88 * diff.enemyHpMult;
+            speed = 6.0;
+            radius = 1.05;
+            fireRate = 1.65;
+
+            const torso = new THREE.Mesh(new THREE.BoxGeometry(1.15, 1.35, 0.95), flayedFleshMat);
+            torso.position.set(0, 0.95, 0);
+            torso.rotation.x = 0.28;
+            torso.castShadow = true;
+            group.add(torso);
+
+            // Sacs d'acide toxique dorsaux
+            const sac1 = new THREE.Mesh(new THREE.SphereGeometry(0.52, 10, 10), acidSacMat);
+            sac1.position.set(-0.28, 1.55, -0.25);
+            group.add(sac1);
+
+            const sac2 = new THREE.Mesh(new THREE.SphereGeometry(0.46, 10, 10), acidSacMat);
+            sac2.position.set(0.32, 1.48, -0.22);
+            group.add(sac2);
+
+            // Gueule cracheuse béante
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.62, 0.65), chitinMat);
+            head.position.set(0, 1.25, 0.52);
+            group.add(head);
+
+            const mouthGlow = new THREE.Mesh(new THREE.SphereGeometry(0.24, 8, 8), new THREE.MeshBasicMaterial({ color: 0xa3e635 }));
+            mouthGlow.position.set(0, 1.15, 0.78);
+            group.add(mouthGlow);
+
+            // Jambes difformes
+            const legL = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.85, 0.38), chitinMat);
+            legL.position.set(-0.38, 0.42, 0);
+            group.add(legL);
+
+            const legR = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.85, 0.38), chitinMat);
+            legR.position.set(0.38, 0.42, 0);
+            group.add(legR);
+
+            animParts = { sac1, sac2, legL, legR };
+
+        } else if (type === 'REAPER') {
+            // ÉCORCHEUR SPECTRAL : Prédateur né d'un cauchemar, silhouette émaciée de 3m sous un voile de chair ténébreuse,
+            // crâne blafard grimaçant, six yeux incandescents, bras-faux d'os poli trempés dans le sang des clones.
+            hp = 110 * diff.enemyHpMult;
+            speed = 8.6 + Math.min(this.sector, 14) * 0.5;
+            radius = 1.0;
+            fireRate = 999;
+
+            const shroudMat = new THREE.MeshStandardMaterial({
+                color: 0x0b0b10,
+                emissive: 0x140408,
+                roughness: 0.95,
+                metalness: 0.05
+            });
+
+            // Voile de chair ténébreux (silhouette fantomatique effilée)
+            const shroud = new THREE.Mesh(new THREE.ConeGeometry(0.95, 2.6, 7), shroudMat);
+            shroud.position.set(0, 1.3, 0);
+            shroud.castShadow = true;
+            group.add(shroud);
+
+            // Cage thoracique écorchée apparente sur le voile
+            for (let r = 0; r < 3; r++) {
+                const rib = new THREE.Mesh(new THREE.TorusGeometry(0.42 - r * 0.07, 0.05, 5, 10, Math.PI), boneMat);
+                rib.position.set(0, 1.55 - r * 0.28, 0.34);
+                group.add(rib);
+            }
+
+            // Crâne blafard allongé et grimaçant
+            const skull = new THREE.Mesh(new THREE.SphereGeometry(0.34, 10, 8), boneMat);
+            skull.scale.set(0.85, 1.1, 1.25);
+            skull.position.set(0, 2.35, 0.34);
+            group.add(skull);
+
+            // Mâchoire béante en permanence
+            const maw = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.34, 0.34), new THREE.MeshBasicMaterial({ color: 0x4c0510 }));
+            maw.position.set(0, 2.16, 0.5);
+            group.add(maw);
+
+            // Six yeux incandescents
+            for (const ex of [-0.16, -0.08, 0.08, 0.16]) {
+                const eye = new THREE.Mesh(new THREE.SphereGeometry(0.045, 6, 6), new THREE.MeshBasicMaterial({ color: 0xff2d2d }));
+                eye.position.set(ex, 2.42, 0.6);
+                group.add(eye);
+            }
+
+            // Bras-faux d'os poli (faucheuses)
+            const reaperL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.14, 1.5), boneMat);
+            reaperL.position.set(-0.72, 1.7, 0.6);
+            reaperL.rotation.y = 0.3;
+            group.add(reaperL);
+
+            const reaperR = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.14, 1.5), boneMat);
+            reaperR.position.set(0.72, 1.7, 0.6);
+            reaperR.rotation.y = -0.3;
+            group.add(reaperR);
+
+            // Goutte de sang permanente sous la créature
+            this.spawnBloodPool(xPos, zPos, 0.9);
+
+            animParts = { reaperL, reaperR };
+
+        } else {
+            // COLOSSE BIOMÉCANIQUE (JUGGERNAUT BRUTE) : Monstre géant ultra-costaud, muscles à vif, côtes apparentes, pince-hachoir et canon organique
+            hp = 260 * diff.enemyHpMult;
+            speed = 5.2;
+            radius = 1.55;
+            fireRate = 1.95;
+
+            // Jambes massives blindées
+            const legL = new THREE.Mesh(new THREE.BoxGeometry(0.65, 1.25, 0.75), chitinMat);
+            legL.position.set(-0.68, 0.62, 0);
+            legL.castShadow = true;
+            group.add(legL);
+
+            const legR = new THREE.Mesh(new THREE.BoxGeometry(0.65, 1.25, 0.75), chitinMat);
+            legR.position.set(0.68, 0.62, 0);
+            legR.castShadow = true;
+            group.add(legR);
+
+            // Torse hypertrophié musculeux
+            const chest = new THREE.Mesh(new THREE.BoxGeometry(2.35, 1.65, 1.45), flayedFleshMat);
+            chest.position.set(0, 1.85, 0);
+            chest.castShadow = true;
+            group.add(chest);
+
+            // Cage thoracique / côtes osseuses apparentes sur le torse
+            for (let r = -0.35; r <= 0.35; r += 0.35) {
+                const rib = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.14, 1.56), boneMat);
+                rib.position.set(0, 1.75 + r, 0.04);
+                group.add(rib);
+            }
+
+            // Épaulière d'acier soudée dans la chair + cuve toxique dorsale
+            const shoulderArmor = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.95, 1.35), chitinMat);
+            shoulderArmor.position.set(-1.35, 2.35, 0);
+            group.add(shoulderArmor);
+
+            const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 1.4, 10), acidSacMat);
+            tank.position.set(0, 2.2, -0.82);
+            group.add(tank);
+
+            // Tête monstrueuse encastrée avec cornes et regard incandescent
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.68, 0.85), chitinMat);
+            head.position.set(0, 2.45, 0.58);
+            group.add(head);
+
+            const eyeBar = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.16, 0.12), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
+            eyeBar.position.set(0, 2.50, 1.02);
+            group.add(eyeBar);
+
+            // Bras gauche : Énorme lame/pince broyeuse ensanglantée
+            const crusherArm = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.75, 1.85), boneMat);
+            crusherArm.position.set(-1.45, 1.55, 0.65);
+            group.add(crusherArm);
+
+            // Bras droit : Canon lourd biomécanique
+            const bioCannon = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.46, 1.75, 10), chitinMat);
+            bioCannon.rotation.x = Math.PI / 2;
+            bioCannon.position.set(1.45, 1.65, 0.72);
+            group.add(bioCannon);
+
+            animParts = { legL, legR, crusherArm, bioCannon };
+        }
+
+        group.position.set(xPos, 0, zPos);
+        this.scene.add(group);
+
+        if (Math.random() < 0.62) {
+            this.audio.playMonsterRoar(type === 'JUGGERNAUT' ? 0.65 : (type === 'REAPER' ? 0.85 : 1.2));
+        }
+
+        this.enemies.push({
+            mesh: group,
+            type,
+            x: xPos,
+            z: zPos,
+            hp,
+            maxHp: hp,
+            speed,
+            radius,
+            fireTimer: Math.random() * fireRate,
+            fireRate,
+            animParts,
+            animTime: Math.random() * 10,
+            strafeDir: Math.random() < 0.5 ? -1 : 1
+        });
+    }
+
+    /**
+     * Apparition du Boss de fin de secteur : Léviathan Carnassier Biomécanique
+     */
+    spawnBoss() {
+        this.bossSpawned = true;
+        this.audio.playMonsterRoar(0.5);
+        this.audio.playSmartBomb();
+        this.screenShake = 1.0;
+
+        const diff = DIFFICULTY_SETTINGS[this.difficulty];
+
+        // NIVEAU TERMINAL : au dernier niveau de la difficulté apparaît le BIG BOSS ultime
+        this.isFinalBoss = this.sector >= this.maxSectors;
+        if (this.isFinalBoss) {
+            this.showBanner(`☠ NIVEAU TERMINAL ${this.sector}/${this.maxSectors} // BIG BOSS : TITAN OMEGA DÉTECTÉ`);
+        } else {
+            this.showBanner('ALERTE MAXIMALE // LÉVIATHAN CARNASSIER DÉTECTÉ');
+        }
+
+        const maxHp = this.isFinalBoss
+            ? 5400 * diff.enemyHpMult
+            : (1650 + (this.sector - 1) * 350) * diff.enemyHpMult;
+
+        const group = new THREE.Group();
+        const fleshMat = new THREE.MeshStandardMaterial({
+            color: 0x7f1d1d,
+            emissive: 0x3b0707,
+            roughness: 0.35
+        });
+        const darkMetalMat = new THREE.MeshStandardMaterial({ color: 0x18181b, metalness: 0.85, roughness: 0.3 });
+        const boneMat = new THREE.MeshStandardMaterial({ color: 0xe7e5e4, roughness: 0.45 });
+        const glowMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+
+        // Masse centrale organique & blindée
+        const core = new THREE.Mesh(new THREE.BoxGeometry(5.6, 2.7, 4.4), fleshMat);
+        core.position.y = 2.1;
+        core.castShadow = true;
+        group.add(core);
+
+        // Gueule centrale géante avec crocs et noyau incandescent
+        const maw = new THREE.Mesh(new THREE.SphereGeometry(1.25, 16, 12), glowMat);
+        maw.position.set(0, 2.2, 2.1);
+        group.add(maw);
+
+        for (let fx = -1.2; fx <= 1.2; fx += 0.6) {
+            const fang = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.85, 5), boneMat);
+            fang.position.set(fx, 3.0, 2.35);
+            fang.rotation.x = Math.PI;
+            group.add(fang);
+        }
+
+        // Tourelles organiques latérales
+        const podGeo = new THREE.BoxGeometry(1.5, 1.5, 2.8);
+        const leftPod = new THREE.Mesh(podGeo, darkMetalMat);
+        leftPod.position.set(-3.5, 2.2, 0.5);
+        group.add(leftPod);
+
+        const rightPod = new THREE.Mesh(podGeo, darkMetalMat);
+        rightPod.position.set(3.5, 2.2, 0.5);
+        group.add(rightPod);
+
+        // 4 pattes biomécaniques géantes
+        for (let sx of [-1, 1]) {
+            for (let sz of [-1, 1]) {
+                const leg = new THREE.Mesh(new THREE.BoxGeometry(1.0, 2.8, 1.0), darkMetalMat);
+                leg.position.set(sx * 3.8, 1.2, sz * 2.1);
+                leg.rotation.z = sx * -0.25;
+                group.add(leg);
+            }
+        }
+
+        const zSpawn = -36;
+        const cx = this.getCanyonCenterX(zSpawn - this.worldScrollZ);
+        group.position.set(cx, 0, zSpawn);
+        this.scene.add(group);
+
+        this.boss = {
+            mesh: group,
+            x: cx,
+            z: zSpawn,
+            hp: maxHp,
+            maxHp: maxHp,
+            dir: 1,
+            attackTimer: 1.5,
+            pattern: 0,
+            isFinal: this.isFinalBoss
+        };
+
+        this.ui.bossName.textContent = this.isFinalBoss
+            ? `NIVEAU ${this.sector}/${this.maxSectors} // ☠ TITAN OMEGA — BIG BOSS ULTIME`
+            : `NIVEAU ${String(this.sector).padStart(2, '0')}/${this.maxSectors} // LÉVIATHAN CARNASSIER MK-${this.sector}`;
+
+        // Le BIG BOSS final est une montagne de chair et d'acier : 1.6x plus gros
+        if (this.isFinalBoss) {
+            group.scale.set(1.55, 1.55, 1.55);
+        }
+
+        this.ui.bossHud.style.display = 'block';
+        this.updateBossHUD();
+    }
+
+    damageBoss(amount) {
+        if (!this.boss) return;
+        this.boss.hp -= amount;
+        this.updateBossHUD();
+
+        if (this.boss.hp <= 0) {
+            const bx = this.boss.x;
+            const bz = this.boss.z;
+            this.scene.remove(this.boss.mesh);
+            this.boss = null;
+            this.ui.bossHud.style.display = 'none';
+
+            this.audio.playMonsterRoar(0.45);
+            this.audio.playSmartBomb();
+            this.screenShake = 1.7;
+            this.hitStopTimer = 0.08;
+            this.triggerFlash('#ef4444', 0.7);
+
+            for (let k = 0; k < 6; k++) {
+                const ox = bx + (Math.random() - 0.5) * 6;
+                const oz = bz + (Math.random() - 0.5) * 4;
+                this.spawnExplosion(ox, 1.6, oz, k % 2 === 0 ? 0xdc2626 : 0xf97316, 22, 1.7);
+                this.spawnGoreBurst(ox, 1.5, oz, 14, 1.5);
+            }
+
+            this.addScore(5000 * this.sector);
+            this.kills += 10;
+
+            if (this.sector >= this.maxSectors) {
+                this.endGame(true);
+            } else {
+                this.sector++;
+                this.sectorDistance = 0;
+                this.sectorGoal = 260 + this.sector * 45;
+                this.bossSpawned = false;
+                this.player.hp = Math.min(this.player.maxHp, this.player.hp + 50);
+                this.player.shield = this.player.maxShield;
+                this.showBanner(`NIVEAU ${String(this.sector).padStart(2, '0')}/${this.maxSectors} DÉBLOQUÉ // ARMURE RÉPARÉE`);
+                this.updateHUD();
+            }
+        }
+    }
+
+    updateBossHUD() {
+        if (!this.boss) return;
+        const pct = Math.max(0, (this.boss.hp / this.boss.maxHp) * 100);
+        this.ui.bossHpBar.style.width = `${pct}%`;
+    }
+
+    /**
+     * Dégâts infligés aux monstres + Effets Gores (Giclées de sang, démembrement et flaques au sol)
+     */
+    damageEnemy(enemy, amount, index) {
+        enemy.hp -= amount;
+        this.audio.playFleshHit();
+
+        // Giclées de sang à chaque impact de balle
+        this.spawnBloodSplatter(enemy.x, 1.1, enemy.z, 5);
+
+        if (enemy.hp <= 0) {
+            this.scene.remove(enemy.mesh);
+            this.enemies.splice(index, 1);
+
+            const isBig = enemy.type === 'JUGGERNAUT' || enemy.type === 'REAPER';
+            const scale = isBig ? 1.45 : 0.95;
+
+            this.audio.playMonsterRoar(isBig ? 0.65 : 1.1);
+            this.audio.playExplosion(scale * 0.85);
+            this.screenShake = Math.max(this.screenShake, isBig ? 0.55 : 0.22);
+
+            // Explosion viscérale : morceaux de chair, os et flaques de sang persistantes
+            this.spawnGoreBurst(enemy.x, 1.1, enemy.z, isBig ? 22 : 12, scale);
+            this.spawnBloodPool(enemy.x, enemy.z, isBig ? 2.4 : 1.45);
+
+            this.kills++;
+            this.combo = Math.min(12, this.combo + 1);
+            this.comboTimer = 3.2;
+            const basePts = isBig ? (enemy.type === 'REAPER' ? 500 : 420) : (enemy.type === 'SPITTER' ? 180 : 120);
+            this.addScore(basePts);
+
+            if (Math.random() < (isBig ? 0.5 : 0.16)) {
+                this.spawnPickup(enemy.x, enemy.z);
+            }
+            this.updateHUD();
+        }
+    }
+
+    /**
+     * Effets Gores : Projection de viscères (gibs) rebondissant au sol et gouttes de sang
+     */
+    spawnBloodSplatter(x, y, z, count = 6) {
+        for (let i = 0; i < count; i++) {
+            const size = 0.14 + Math.random() * 0.18;
+            const mesh = new THREE.Mesh(
+                new THREE.BoxGeometry(size, size, size),
+                new THREE.MeshBasicMaterial({ color: i % 2 === 0 ? 0x991b1b : 0xdc2626 })
+            );
+            mesh.position.set(x, y, z);
+            this.scene.add(mesh);
+
+            const angle = Math.random() * Math.PI * 2;
+            const spd = 3 + Math.random() * 9;
+            this.particles.push({
+                mesh,
+                type: 'BLOOD',
+                vx: Math.cos(angle) * spd,
+                vy: 2.5 + Math.random() * 6,
+                vz: Math.sin(angle) * spd,
+                life: 0.35 + Math.random() * 0.25,
+                maxLife: 0.6
+            });
+        }
+    }
+
+    spawnGoreBurst(x, y, z, count = 14, scale = 1.0) {
+        this.spawnBloodSplatter(x, y, z, count);
+
+        // Morceaux organiques & ossements qui volent et rebondissent sur le sol
+        const gibCount = Math.floor(count * 0.6);
+        for (let i = 0; i < gibCount; i++) {
+            const isBone = i % 3 === 0;
+            const geo = isBone
+                ? new THREE.CylinderGeometry(0.08 * scale, 0.10 * scale, 0.55 * scale, 6)
+                : new THREE.DodecahedronGeometry((0.22 + Math.random() * 0.18) * scale, 0);
+            const mat = new THREE.MeshStandardMaterial({
+                color: isBone ? 0xe7e5e4 : 0x7f1d1d,
+                roughness: 0.4
+            });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(x, y, z);
+            this.scene.add(mesh);
+
+            const angle = Math.random() * Math.PI * 2;
+            const spd = (4 + Math.random() * 11) * scale;
+            this.particles.push({
+                mesh,
+                type: 'GIB',
+                vx: Math.cos(angle) * spd,
+                vy: (6 + Math.random() * 9) * scale,
+                vz: Math.sin(angle) * spd,
+                rotX: (Math.random() - 0.5) * 18,
+                rotZ: (Math.random() - 0.5) * 18,
+                life: 1.4 + Math.random() * 0.8,
+                maxLife: 2.2
+            });
+        }
+    }
+
+    spawnBloodPool(x, z, radius = 1.5) {
+        const geo = new THREE.CircleGeometry(radius, 14);
+        const mat = new THREE.MeshBasicMaterial({
+            color: 0x5c0a0a,
+            transparent: true,
+            opacity: 0.82
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.position.set(x, 0.03, z);
+        this.scene.add(mesh);
+
+        this.bloodPools.push({ mesh, x, z, life: 12.0 });
+        if (this.bloodPools.length > 45) {
+            const oldest = this.bloodPools.shift();
+            this.scene.remove(oldest.mesh);
+        }
+    }
+
+    damagePlayer(rawAmount) {
+        if (this.player.invulnTimer > 0 || this.state !== 'PLAYING') return;
+
+        // MODE CHEAT : le clone est totalement invulnérable jusqu'au BIG BOSS final
+        if (this.cheatMode) {
+            this.triggerFlash('#a855f7', 0.18);
+            return;
+        }
+
+        const diff = DIFFICULTY_SETTINGS[this.difficulty];
+        let dmg = rawAmount * diff.enemyDmgMult;
+
+        this.audio.playHit();
+        this.screenShake = Math.max(this.screenShake, 0.58);
+        this.player.invulnTimer = 0.48;
+        this.player.shieldRegenDelay = 3.2;
+        this.combo = 1;
+
+        if (this.player.shield > 0) {
+            this.triggerFlash('#38bdf8', 0.35);
+            if (this.player.shield >= dmg) {
+                this.player.shield -= dmg;
+                dmg = 0;
+            } else {
+                dmg -= this.player.shield;
+                this.player.shield = 0;
+            }
+        }
+
+        if (dmg > 0) {
+            this.triggerFlash('#ef4444', 0.52);
+            this.player.hp = Math.max(0, this.player.hp - dmg);
+            this.spawnBloodSplatter(this.player.x, 1.3, this.player.z, 6);
+        }
+
+        this.updateHUD();
+
+        if (this.player.hp <= 0) {
+            this.spawnExplosion(this.player.x, 1.2, this.player.z, 0x38bdf8, 35, 1.8);
+            this.playerGroup.visible = false;
+            this.aimLaser.visible = false;
+            this.reticleMesh.visible = false;
+            this.endGame(false);
+        }
+    }
+
+    spawnEnemyBullet(x, z, vx, vz, color = 0x84cc16, size = 0.36) {
+        const mesh = new THREE.Mesh(
+            new THREE.SphereGeometry(size, 8, 8),
+            new THREE.MeshBasicMaterial({ color })
+        );
+        mesh.position.set(x, 1.3, z);
+        this.scene.add(mesh);
+
+        this.enemyBullets.push({
+            mesh,
+            x,
+            z,
+            vx,
+            vz,
+            life: 4.2
+        });
+    }
+
+    spawnExplosion(x, y, z, color, count = 14, scale = 1.0) {
+        for (let i = 0; i < count; i++) {
+            const size = (0.18 + Math.random() * 0.28) * scale;
+            const mesh = new THREE.Mesh(
+                new THREE.BoxGeometry(size, size, size),
+                new THREE.MeshBasicMaterial({ color: i % 3 === 0 ? 0xfef08a : color })
+            );
+            mesh.position.set(x, y, z);
+            this.scene.add(mesh);
+
+            const angle = Math.random() * Math.PI * 2;
+            const spd = (4 + Math.random() * 14) * scale;
+            this.particles.push({
+                mesh,
+                type: 'SPARK',
+                vx: Math.cos(angle) * spd,
+                vy: 4 + Math.random() * 10 * scale,
+                vz: Math.sin(angle) * spd,
+                life: 0.32 + Math.random() * 0.28,
+                maxLife: 0.6
+            });
+        }
+    }
+
+    addScore(points) {
+        this.score += Math.round(points * this.combo);
+    }
+
+    updateHUD() {
+        const p = this.player;
+        this.ui.hpBar.style.width = `${(p.hp / p.maxHp) * 100}%`;
+        this.ui.shieldBar.style.width = `${(p.shield / p.maxShield) * 100}%`;
+        this.ui.dashBar.style.width = `${p.dashEnergy}%`;
+        this.ui.scoreVal.textContent = String(this.score).padStart(6, '0');
+        this.ui.comboVal.textContent = `x${this.combo}`;
+
+        this.ui.sectorLabel.textContent = `NIVEAU ${String(this.sector).padStart(2, '0')}/${this.maxSectors} // ${this.bossSpawned ? 'COMBAT DE BOSS' : 'CANYON SINUEUX'}`;
+        const secPct = Math.min(100, (this.sectorDistance / this.sectorGoal) * 100);
+        this.ui.sectorProgress.style.width = `${secPct}%`;
+
+        const w = WEAPONS[p.weapon];
+        this.ui.weaponIcon.textContent = w.icon;
+        this.ui.weaponName.textContent = w.name;
+        const ammoPct = w.infinite ? 100 : Math.max(0, (p.ammo / p.maxAmmo) * 100);
+        this.ui.weaponAmmoBar.style.width = `${ammoPct}%`;
+
+        const pips = this.ui.bombsContainer.children;
+        for (let i = 0; i < pips.length; i++) {
+            if (i < p.bombs) pips[i].classList.remove('empty');
+            else pips[i].classList.add('empty');
+        }
+    }
+
+    endGame(victory) {
+        this.state = victory ? 'VICTORY' : 'GAMEOVER';
+        this.audio.stopMusic();
+
+        document.getElementById('end-sub').textContent = victory
+            ? `OBJECTIF ACCOMPLI // ${this.maxSectors} NIVEAUX PURGÉS [${this.difficulty.toUpperCase()}]`
+            : 'SIGNAL VITAL PERDU';
+        document.getElementById('end-title').textContent = victory ? 'MISSION RÉUSSIE' : 'CLONE ÉLIMINÉ';
+        document.getElementById('final-score').textContent = this.score;
+        document.getElementById('final-kills').textContent = this.kills;
+        document.getElementById('final-sector').textContent = `${String(this.sector).padStart(2, '0')}/${this.maxSectors}`;
+
+        this.ui.hud.classList.add('hidden');
+        this.ui.endScreen.classList.remove('hidden');
+    }
+
+    /**
+     * Boucle principale de simulation & rendu (60 FPS)
+     */
+    animate() {
+        requestAnimationFrame(this.animate);
+
+        if (this.state === 'PAUSED') {
+            this.renderer.render(this.scene, this.camera);
+            return;
+        }
+
+        const rawDt = Math.min(this.clock.getDelta(), 0.05);
+
+        if (this.hitStopTimer > 0) {
+            this.hitStopTimer -= rawDt;
+            this.renderer.render(this.scene, this.camera);
+            return;
+        }
+
+        const dt = rawDt;
+
+        // Défilement du canyon sinueux
+        const scrollSpeed = this.state === 'PLAYING' ? (this.bossSpawned ? 2.5 : 9.8) : 5.5;
+        this.worldScrollZ += scrollSpeed * dt;
+
+        this.floorTiles.forEach(tile => {
+            tile.position.z += scrollSpeed * dt;
+            if (tile.position.z > 30) {
+                tile.position.z -= this.numTiles * this.tileLength;
+            }
+            this.alignSegmentToCurve(tile, tile.position.z);
+        });
+
+        if (this.state === 'PLAYING') {
+            this.updatePlaying(dt, scrollSpeed);
+        } else {
+            const t = performance.now() * 0.0005;
+            const cx = this.getCanyonCenterX(-this.worldScrollZ);
+            this.camera.position.set(cx + Math.sin(t) * 2.5, 21, 17);
+            this.camera.lookAt(cx, 0, -4);
+        }
+
+        this.renderer.render(this.scene, this.camera);
+    }
+
+    updatePlaying(dt, scrollSpeed) {
+        const p = this.player;
+
+        // 1. Déplacement du joueur + Propulseur Dash Tactique
+        let moveX = 0;
+        let moveZ = 0;
+        if (this.keys['KeyA'] || this.keys['ArrowLeft']) moveX -= 1;
+        if (this.keys['KeyD'] || this.keys['ArrowRight']) moveX += 1;
+        if (this.keys['KeyW'] || this.keys['ArrowUp']) moveZ -= 1;
+        if (this.keys['KeyS'] || this.keys['ArrowDown']) moveZ += 1;
+
+        if (p.dashTimer > 0) {
+            p.dashTimer -= dt;
+            p.x += p.dashDirX * 34 * dt;
+            p.z += p.dashDirZ * 34 * dt;
+        } else if (moveX !== 0 || moveZ !== 0) {
+            const len = Math.hypot(moveX, moveZ);
+            moveX /= len;
+            moveZ /= len;
+            p.x += moveX * p.speed * dt;
+            p.z += moveZ * p.speed * dt;
+
+            // Orientation naturelle des hanches dans le sens de la marche
+            const walkAngle = Math.atan2(-moveX, -moveZ);
+            this.hipsGroup.rotation.y = walkAngle;
+
+            // Animation réaliste des jambes articulées + balancement du corps en course
+            p.animTime += dt * 16;
+            this.leftLegPivot.rotation.x = Math.sin(p.animTime) * 0.72;
+            this.rightLegPivot.rotation.x = -Math.sin(p.animTime) * 0.72;
+            // Rebond vertical crédible de la foulée + inclinaison avant d'assaut
+            this.playerGroup.position.y = Math.abs(Math.sin(p.animTime)) * 0.13;
+            this.torsoGroup.rotation.x = 0.14 + Math.sin(p.animTime * 2) * 0.03;
+            this.playerGroup.rotation.z = Math.sin(p.animTime) * 0.05;
+            // Balancement des bras armés pendant la course
+            this.rifleGroup.rotation.x = Math.sin(p.animTime) * 0.06;
+        } else {
+            this.leftLegPivot.rotation.x *= 0.8;
+            this.rightLegPivot.rotation.x *= 0.8;
+            // Respiration lente du soldat à l'arrêt
+            this.playerGroup.position.y *= 0.8;
+            this.playerGroup.rotation.z *= 0.8;
+            this.torsoGroup.rotation.x += (0.02 + Math.sin(performance.now() * 0.0022) * 0.015 - this.torsoGroup.rotation.x) * 4 * dt;
+            this.rifleGroup.rotation.x *= 0.85;
+        }
+
+        // Recharge de l'énergie du Dash
+        if (p.dashEnergy < 100) {
+            p.dashEnergy = Math.min(100, p.dashEnergy + 28 * dt);
+        }
+
+        // Limites verticales écran + Collisions strictes avec les parois sinueuses et les obstacles
+        p.z = Math.max(-13, Math.min(11, p.z));
+        this.resolveWorldCollision(p, 0.82);
+        this.playerGroup.position.set(p.x, 0, p.z);
+
+        // 2. Visée laser 3D & Orientation de la lampe torche frontale
+        this.raycaster.setFromCamera(this.mouseNDC, this.camera);
+        if (this.raycaster.ray.intersectPlane(this.aimPlane, this.aimWorldPoint)) {
+            const dx = this.aimWorldPoint.x - p.x;
+            const dz = this.aimWorldPoint.z - p.z;
+            const targetAngle = Math.atan2(-dx, -dz);
+            this.torsoGroup.rotation.y = targetAngle;
+
+            if (moveX === 0 && moveZ === 0) {
+                this.hipsGroup.rotation.y += (targetAngle - this.hipsGroup.rotation.y) * 8 * dt;
+            }
+
+            // Mise à jour de la lampe torche du casque
+            this.flashLight.position.set(p.x, 2.2, p.z);
+            this.flashLightTarget.position.set(this.aimWorldPoint.x, 0.5, this.aimWorldPoint.z);
+
+            this.reticleMesh.position.set(this.aimWorldPoint.x, 0.08, this.aimWorldPoint.z);
+            this.reticleMesh.rotation.z += dt * 3;
+
+            const positions = this.aimLaser.geometry.attributes.position.array;
+            positions[0] = p.x;
+            positions[1] = 1.45;
+            positions[2] = p.z;
+            positions[3] = this.aimWorldPoint.x;
+            positions[4] = 0.2;
+            positions[5] = this.aimWorldPoint.z;
+            this.aimLaser.geometry.attributes.position.needsUpdate = true;
+        }
+
+        // 3. Régénération bouclier & invulnérabilité
+        if (p.invulnTimer > 0) {
+            p.invulnTimer -= dt;
+            this.playerGroup.visible = p.dashTimer > 0 ? true : Math.floor(p.invulnTimer * 24) % 2 === 0;
+        } else {
+            this.playerGroup.visible = true;
+        }
+
+        if (p.shieldRegenDelay > 0) {
+            p.shieldRegenDelay -= dt;
+        } else if (p.shield < p.maxShield) {
+            p.shield = Math.min(p.maxShield, p.shield + 14 * dt);
+        }
+        this.shieldMesh.visible = p.shield > 5;
+        this.shieldMesh.rotation.y += dt * 1.8;
+
+        if (this.combo > 1) {
+            this.comboTimer -= dt;
+            if (this.comboTimer <= 0) this.combo = 1;
+        }
+
+        this.rifleGroup.position.z += (-0.58 - this.rifleGroup.position.z) * 16 * dt;
+        this.muzzleLight.intensity *= Math.pow(0.02, dt);
+        this.playerLight.position.set(p.x, 3.2, p.z);
+
+        // 4. Cadence de tir
+        if (p.fireTimer > 0) p.fireTimer -= dt;
+        if (this.isFiring && p.fireTimer <= 0) {
+            this.firePlayerWeapon();
+        }
+
+        // 5. Progression du secteur & Génération d'obstacles / ennemis
+        if (!this.bossSpawned) {
+            this.sectorDistance += scrollSpeed * dt;
+            if (this.sectorDistance >= this.sectorGoal) {
+                this.spawnBoss();
+            } else {
+                const diff = DIFFICULTY_SETTINGS[this.difficulty];
+                this.spawnTimer -= dt;
+                if (this.spawnTimer <= 0) {
+                    this.spawnEnemy();
+                    this.spawnTimer = Math.max(0.45, (1.42 - this.sector * 0.18) * diff.spawnRateMult);
+                }
+            }
+        }
+
+        this.obstacleSpawnTimer -= dt;
+        if (this.obstacleSpawnTimer <= 0 && !this.bossSpawned) {
+            this.spawnTacticalObstacle(-54);
+            this.spawnTacticalObstacle(-50);
+            this.obstacleSpawnTimer = 0.95 + Math.random() * 0.55;
+        }
+
+        // SURPRISES ALEATOIRES DU PARCOURS : largages alliés ou embuscades xéno
+        this.surpriseTimer -= dt;
+        if (this.surpriseTimer <= 0 && !this.bossSpawned) {
+            this.triggerSurprise();
+            this.surpriseTimer = 13 + Math.random() * 9;
+        }
+
+        this.propSpawnTimer -= dt;
+        if (this.propSpawnTimer <= 0) {
+            this.spawnProp(-52);
+            this.propSpawnTimer = 2.0 + Math.random() * 1.3;
+        }
+
+        // 6. Défilement des obstacles tactiques (et poussée douce si un obstacle atteint le joueur)
+        for (let i = this.obstacles.length - 1; i >= 0; i--) {
+            const obs = this.obstacles[i];
+            obs.z += scrollSpeed * dt;
+            obs.mesh.position.z = obs.z;
+
+            if (obs.z > 22) {
+                this.scene.remove(obs.mesh);
+                this.obstacles.splice(i, 1);
+            }
+        }
+        // Re-vérification collision joueur après déplacement des obstacles
+        this.resolveWorldCollision(p, 0.82);
+        this.playerGroup.position.set(p.x, 0, p.z);
+
+        // 7. Projectiles du joueur (arrêtés par les murs du canyon et les abris !)
+        for (let i = this.bullets.length - 1; i >= 0; i--) {
+            const b = this.bullets[i];
+            b.life -= dt;
+
+            if (b.homing && (this.enemies.length > 0 || this.boss)) {
+                let target = this.boss;
+                let bestDist = target ? Math.hypot(target.x - b.x, target.z - b.z) : 999;
+                for (const e of this.enemies) {
+                    const d = Math.hypot(e.x - b.x, e.z - b.z);
+                    if (d < bestDist) {
+                        bestDist = d;
+                        target = e;
+                    }
+                }
+                if (target) {
+                    const desiredAngle = Math.atan2(-(target.x - b.x), -(target.z - b.z));
+                    b.vx += (-Math.sin(desiredAngle) * b.speed - b.vx) * 8 * dt;
+                    b.vz += (-Math.cos(desiredAngle) * b.speed - b.vz) * 8 * dt;
+                    b.mesh.rotation.y = Math.atan2(-b.vx, -b.vz);
+                }
+            }
+
+            b.x += b.vx * dt;
+            b.z += b.vz * dt;
+            b.mesh.position.set(b.x, 1.45, b.z);
+
+            let removeBullet = b.life <= 0;
+
+            // Impact contre paroi du canyon ou obstacle tactique
+            if (!removeBullet && this.checkBulletBlockedByCover(b.x, b.z, 0.2)) {
+                this.spawnExplosion(b.x, 1.3, b.z, 0xfacc15, 4, 0.45);
+                removeBullet = true;
+            }
+
+            // Collision caisses/barils
+            if (!removeBullet) {
+                for (let j = this.props.length - 1; j >= 0; j--) {
+                    const pr = this.props[j];
+                    if (Math.hypot(b.x - pr.x, b.z - pr.z) < 1.15) {
+                        pr.hp -= b.damage;
+                        this.spawnExplosion(b.x, 1.1, b.z, 0xfacc15, 4, 0.5);
+                        if (pr.hp <= 0) this.destroyProp(pr, j);
+                        if (!b.piercing) { removeBullet = true; break; }
+                    }
+                }
+            }
+
+            // Collision monstres
+            if (!removeBullet) {
+                for (let j = this.enemies.length - 1; j >= 0; j--) {
+                    const e = this.enemies[j];
+                    if (Math.hypot(b.x - e.x, b.z - e.z) < e.radius + 0.35) {
+                        this.damageEnemy(e, b.damage, j);
+                        if (!b.piercing) { removeBullet = true; break; }
+                    }
+                }
+            }
+
+            // Collision Boss
+            if (!removeBullet && this.boss) {
+                const bw = this.boss.isFinal ? 5.4 : 3.4;
+                const bd = this.boss.isFinal ? 3.8 : 2.5;
+                if (Math.abs(b.x - this.boss.x) < bw && Math.abs(b.z - this.boss.z) < bd) {
+                    this.spawnBloodSplatter(b.x, 1.8, b.z, 6);
+                    this.damageBoss(b.damage);
+                    if (!b.piercing) removeBullet = true;
+                }
+            }
+
+            if (removeBullet) {
+                this.scene.remove(b.mesh);
+                this.bullets.splice(i, 1);
+            }
+        }
+
+        // 8. Intelligence & Animation des monstres biomécaniques (contournent les obstacles)
+        for (let i = this.enemies.length - 1; i >= 0; i--) {
+            const e = this.enemies[i];
+            e.animTime += dt * 12;
+
+            const dx = p.x - e.x;
+            const dz = p.z - e.z;
+            const dist = Math.max(0.01, Math.hypot(dx, dz));
+
+            if (e.type === 'SWARMER') {
+                e.x += (dx / dist) * e.speed * dt;
+                e.z += (dz / dist) * e.speed * dt;
+                e.mesh.rotation.y = Math.atan2(dx, dz);
+                // Animation agressive des griffes
+                e.animParts.lClaw.rotation.x = Math.sin(e.animTime * 1.5) * 0.45;
+                e.animParts.rClaw.rotation.x = -Math.sin(e.animTime * 1.5) * 0.45;
+            } else if (e.type === 'REAPER') {
+                // ÉCORCHEUR SPECTRAL : rocade sinistre en zigzag vers la proie, faux os brandis
+                e.x += (dx / dist) * e.speed * dt + Math.sin(e.animTime * 0.8) * 2.4 * dt;
+                e.z += (dz / dist) * e.speed * dt;
+                e.mesh.rotation.y = Math.atan2(dx, dz);
+                e.mesh.position.y = Math.sin(e.animTime * 0.6) * 0.12;
+                e.animParts.reaperL.rotation.x = Math.sin(e.animTime * 1.1) * 0.5;
+                e.animParts.reaperR.rotation.x = -Math.sin(e.animTime * 1.1) * 0.5;
+                // Traînée de sang du prédateur
+                if (Math.random() < 0.02) this.spawnBloodPool(e.x, e.z, 0.5);
+            } else if (e.type === 'SPITTER') {
+                e.z += e.speed * dt;
+                e.x += e.strafeDir * 3.8 * dt;
+                const worldZ = e.z - this.worldScrollZ;
+                const cx = this.getCanyonCenterX(worldZ);
+                const hw = this.getCanyonHalfWidth(worldZ) - 1.5;
+                if (e.x < cx - hw || e.x > cx + hw) e.strafeDir *= -1;
+
+                e.mesh.rotation.y = Math.atan2(dx, dz);
+                const pulse = 1 + Math.sin(e.animTime) * 0.14;
+                e.animParts.sac1.scale.set(pulse, pulse, pulse);
+                e.animParts.sac2.scale.set(pulse, pulse, pulse);
+
+                e.fireTimer -= dt;
+                if (e.fireTimer <= 0 && e.z < p.z - 2) {
+                    e.fireTimer = e.fireRate;
+                    const aimA = Math.atan2(dx, dz);
+                    this.spawnEnemyBullet(e.x, e.z + 0.9, Math.sin(aimA) * 16.5, Math.cos(aimA) * 16.5, 0x84cc16, 0.38);
+                }
+            } else {
+                // JUGGERNAUT BRUTE
+                e.x += (dx / dist) * (e.speed * 0.65) * dt;
+                e.z += e.speed * dt;
+                e.mesh.rotation.y = Math.atan2(dx, dz);
+
+                e.animParts.legL.rotation.x = Math.sin(e.animTime * 0.7) * 0.45;
+                e.animParts.legR.rotation.x = -Math.sin(e.animTime * 0.7) * 0.45;
+                e.animParts.crusherArm.rotation.x = Math.sin(e.animTime * 0.9) * 0.35;
+
+                e.fireTimer -= dt;
+                if (e.fireTimer <= 0 && e.z < p.z - 2) {
+                    e.fireTimer = e.fireRate;
+                    const aimA = Math.atan2(dx, dz);
+                    for (const off of [-0.24, 0, 0.24]) {
+                        this.spawnEnemyBullet(e.x, e.z + 1.2, Math.sin(aimA + off) * 15.5, Math.cos(aimA + off) * 15.5, 0xef4444, 0.44);
+                    }
+                }
+            }
+
+            // Les monstres sont également bloqués par les murs du canyon et contournent les abris
+            this.resolveWorldCollision(e, e.radius);
+            e.mesh.position.set(e.x, 0, e.z);
+
+            if (dist < e.radius + 0.85) {
+                this.damagePlayer(e.type === 'JUGGERNAUT' ? 34 : (e.type === 'REAPER' ? 28 : 20));
+                this.damageEnemy(e, 999, i);
+                continue;
+            }
+
+            if (e.z > 22) {
+                this.scene.remove(e.mesh);
+                this.enemies.splice(i, 1);
+            }
+        }
+
+        // 9. Comportement & Attaques du Boss
+        if (this.boss) {
+            const b = this.boss;
+            b.z += (-12 - b.z) * 1.5 * dt;
+            const cx = this.getCanyonCenterX(b.z - this.worldScrollZ);
+            const hw = this.getCanyonHalfWidth(b.z - this.worldScrollZ) - 4.0;
+
+            b.x += b.dir * (5.2 + this.sector + (b.isFinal ? 2.6 : 0)) * dt;
+            if (b.x > cx + hw) { b.x = cx + hw; b.dir = -1; }
+            if (b.x < cx - hw) { b.x = cx - hw; b.dir = 1; }
+            b.mesh.position.set(b.x, 0, b.z);
+
+            b.attackTimer -= dt;
+            if (b.attackTimer <= 0) {
+                b.pattern = (b.pattern + 1) % (b.isFinal ? 3 : 2);
+                if (b.pattern === 0) {
+                    b.attackTimer = b.isFinal ? 1.15 : 1.55;
+                    for (let a = -0.65; a <= 0.65; a += 0.22) {
+                        this.spawnEnemyBullet(b.x, b.z + 2.3, Math.sin(a) * 16.5, Math.cos(a) * 16.5, 0xfacc15, 0.45);
+                    }
+                } else if (b.pattern === 1) {
+                    b.attackTimer = b.isFinal ? 1.0 : 1.25;
+                    for (const podX of [b.x - 3.5, b.x + 3.5]) {
+                        const ang = Math.atan2(p.x - podX, p.z - b.z);
+                        this.spawnEnemyBullet(podX, b.z + 1.9, Math.sin(ang) * 20, Math.cos(ang) * 20, 0xef4444, 0.44);
+                    }
+                } else {
+                    // ATTAQUE EXCLUSIVE BIG BOSS : tempête de spores circulaire à 360°
+                    b.attackTimer = 1.3;
+                    this.audio.playMonsterRoar(0.45);
+                    this.screenShake = Math.max(this.screenShake, 0.7);
+                    for (let a = 0; a < Math.PI * 2; a += Math.PI / 9) {
+                        this.spawnEnemyBullet(b.x, b.z + 1.6, Math.sin(a) * 13.5, Math.cos(a) * 13.5, 0xa855f7, 0.5);
+                    }
+                }
+            }
+        }
+
+        // 10. Projectiles ennemis (arrêtés par les bunkers et piliers rocheux !)
+        for (let i = this.enemyBullets.length - 1; i >= 0; i--) {
+            const eb = this.enemyBullets[i];
+            eb.life -= dt;
+            eb.x += eb.vx * dt;
+            eb.z += eb.vz * dt;
+            eb.mesh.position.set(eb.x, 1.3, eb.z);
+
+            // L'abri protège le joueur des tirs ennemis
+            if (this.checkBulletBlockedByCover(eb.x, eb.z, 0.28)) {
+                this.spawnExplosion(eb.x, 1.2, eb.z, 0x84cc16, 4, 0.45);
+                this.scene.remove(eb.mesh);
+                this.enemyBullets.splice(i, 1);
+                continue;
+            }
+
+            if (Math.hypot(eb.x - p.x, eb.z - p.z) < 0.92) {
+                this.damagePlayer(18);
+                this.scene.remove(eb.mesh);
+                this.enemyBullets.splice(i, 1);
+                continue;
+            }
+
+            if (eb.life <= 0 || eb.z > 22) {
+                this.scene.remove(eb.mesh);
+                this.enemyBullets.splice(i, 1);
+            }
+        }
+
+        // 11. Caisses, barils, bonus & flaques de sang défilants
+        for (let i = this.props.length - 1; i >= 0; i--) {
+            const pr = this.props[i];
+            pr.z += scrollSpeed * dt;
+            pr.mesh.position.z = pr.z;
+            if (pr.z > 22) {
+                this.scene.remove(pr.mesh);
+                this.props.splice(i, 1);
+            }
+        }
+
+        for (let i = this.bloodPools.length - 1; i >= 0; i--) {
+            const bp = this.bloodPools[i];
+            bp.z += scrollSpeed * dt;
+            bp.mesh.position.z = bp.z;
+            if (bp.z > 24) {
+                this.scene.remove(bp.mesh);
+                this.bloodPools.splice(i, 1);
+            }
+        }
+
+        for (let i = this.pickups.length - 1; i >= 0; i--) {
+            const pk = this.pickups[i];
+            pk.time += dt * 4;
+            pk.z += scrollSpeed * 0.65 * dt;
+            pk.mesh.position.set(pk.x, 0.9 + Math.sin(pk.time) * 0.25, pk.z);
+            pk.mesh.children[0].rotation.y += dt * 3;
+
+            if (Math.hypot(pk.x - p.x, pk.z - p.z) < 1.55) {
+                this.applyPickup(pk);
+                this.scene.remove(pk.mesh);
+                this.pickups.splice(i, 1);
+                continue;
+            }
+
+            if (pk.z > 22) {
+                this.scene.remove(pk.mesh);
+                this.pickups.splice(i, 1);
+            }
+        }
+
+        // 12. Particules, viscères rebondissants (gibs) & ondes de choc
+        for (let i = this.particles.length - 1; i >= 0; i--) {
+            const pt = this.particles[i];
+            pt.life -= dt;
+
+            if (pt.type === 'SHOCKWAVE') {
+                const progress = 1 - pt.life / pt.maxLife;
+                const scale = 1 + progress * 17;
+                pt.mesh.scale.set(scale, scale, 1);
+                pt.mesh.material.opacity = Math.max(0, 1 - progress);
+            } else if (pt.type === 'GIB') {
+                pt.vy -= 28 * dt;
+                pt.mesh.position.x += pt.vx * dt;
+                pt.mesh.position.y += pt.vy * dt;
+                pt.mesh.position.z += (pt.vz + scrollSpeed * 0.85) * dt;
+                pt.mesh.rotation.x += pt.rotX * dt;
+                pt.mesh.rotation.z += pt.rotZ * dt;
+
+                // Rebond sur le sol du canyon
+                if (pt.mesh.position.y < 0.16) {
+                    pt.mesh.position.y = 0.16;
+                    pt.vy = Math.abs(pt.vy) * 0.42;
+                    pt.vx *= 0.65;
+                    pt.vz *= 0.65;
+                }
+            } else {
+                pt.vy -= 26 * dt;
+                pt.mesh.position.x += pt.vx * dt;
+                pt.mesh.position.y = Math.max(0.08, pt.mesh.position.y + pt.vy * dt);
+                pt.mesh.position.z += pt.vz * dt;
+                pt.mesh.rotation.x += dt * 10;
+                pt.mesh.rotation.y += dt * 10;
+                const s = Math.max(0.01, pt.life / pt.maxLife);
+                pt.mesh.scale.set(s, s, s);
+            }
+
+            if (pt.life <= 0) {
+                this.scene.remove(pt.mesh);
+                this.particles.splice(i, 1);
+            }
+        }
+
+        this.updateHUD();
+
+        // 13. Suivi fluide de la caméra dans les virages du canyon + Secousses
+        let shakeX = 0;
+        let shakeY = 0;
+        if (this.screenShake > 0) {
+            shakeX = (Math.random() - 0.5) * this.screenShake * 1.4;
+            shakeY = (Math.random() - 0.5) * this.screenShake * 1.4;
+            this.screenShake = Math.max(0, this.screenShake - dt * 2.8);
+        }
+
+        const targetCamX = p.x * 0.62 + shakeX;
+        const targetCamY = 20.5 + shakeY;
+        const targetCamZ = p.z * 0.35 + 15.8;
+
+        this.camera.position.x += (targetCamX - this.camera.position.x) * 8 * dt;
+        this.camera.position.y += (targetCamY - this.camera.position.y) * 8 * dt;
+        this.camera.position.z += (targetCamZ - this.camera.position.z) * 8 * dt;
+        this.camera.lookAt(p.x * 0.55, 0.5, p.z - 5.5);
+    }
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+    window.expendableGame = new ExpendableGame();
+});
+</script>
+</body>
+</html>
